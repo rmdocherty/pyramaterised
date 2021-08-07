@@ -42,7 +42,7 @@ class QuantumCircuit():
             raise Exception("Please supply a valid entangler!")
 
         self._gradient_state_list = [] #to be appended to later
-        self._gradient_list = []
+        self._gradient_list = np.zeros(12)
         self._gen_single_qubit_ops() #initialise ops
 
     def _gen_single_qubit_ops(self):
@@ -90,7 +90,7 @@ class QuantumCircuit():
         elif self._entangler == "iswap":
             gate = qt.qip.operations.sqrtiswap
             gate_list = [gate(self._n_qubits, [j, k]) for j, k in entangling_gate_indices]
-        entangling_layer = prod(gate_list)[::-1] #reverse so unitaries applied in correct order
+        entangling_layer = prod(gate_list[::-1]) #reverse so unitaries applied in correct order
         return entangling_layer
 
     def _gen_intial_state(self):
@@ -127,11 +127,14 @@ class QuantumCircuit():
         entangling_layer = self._gen_entangling_layer(entangling_gate_indices)
 
         initial_angles, initial_pauli = self._gen_initial_rotations()
+
         for param in range(-1, self._n_params):
             counter = 0
             circuit_state = self._gen_intial_state()
+
             for layer in range(self._layers):
                 rot_op = []
+
                 for qubit in range(self._n_qubits):
                     angle = initial_angles[layer][qubit]
                     ini_pauli_sigma = initial_pauli[layer][qubit]
