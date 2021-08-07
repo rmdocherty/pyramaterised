@@ -42,7 +42,8 @@ class QuantumCircuit():
             raise Exception("Please supply a valid entangler!")
 
         self._gradient_state_list = [] #to be appended to later
-        self._gradient_list = np.zeros(12)
+        self._gradient_list = np.zeros(self._n_params)
+
         self._gen_single_qubit_ops() #initialise ops
 
     def _gen_single_qubit_ops(self):
@@ -54,9 +55,18 @@ class QuantumCircuit():
         self._opX = [genFockOp(qt.sigmax(), i, self._n_qubits, levels) for i in n_qubit_range]
         self._opId = genFockOp(qt.qeye(levels), 0, self._n_qubits)
 
-        self._H = self._opZ[0] * self._opZ[1] #also used later
+        self._H = self._opZ[0] * self._opZ[1] #ZZ operator on first 2 qubits
 
     def _gen_initial_rotations(self):
+        """
+        Generate the initial parameters (theta) of the QC i.e both the type of
+        rotation (X,Y,Z) and the angle (randomised between 0 and 2 pi).
+        Returns:
+            initial_angles: [float, ...]
+            List of angles that a given gate rotates by, between 0 and 2 pi
+            initial_pauli: [int, ...]
+            List of what type of Pauli matrix a given rotation is (i.e X, Y, Z)
+        """
         size = [self._layers, self._n_qubits]
         #angles for circuit - this is the theta/parameters
         initial_angles = rng.random(size) * 2 * np.pi
@@ -65,7 +75,14 @@ class QuantumCircuit():
         return initial_angles, initial_pauli
 
     def _gen_entanglement_indices(self):
-        """Generate the qubit index pairs for connected qubits based on QC topology"""
+        """
+        Generate the qubit index pairs for connected qubits based on QC topology
+        Returns:
+            entangling_gate_indices: [[int, int], ...]
+            A list of list (pairs) of integers that represent gate connections
+            in the QC.
+        TODO: add the alternating topolgy here!
+        """
         if self._topology == "chain":
             top_connections = [[2 * j, 2 * j + 1] for j in range(self._n_qubits // 2)]
             bottom_connections = [[2 * j + 1, 2 * j + 2] for j in range((self._n_qubits - 1) // 2)]
@@ -79,8 +96,13 @@ class QuantumCircuit():
         return entangling_gate_indices
 
     def _gen_entangling_layer(self, entangling_gate_indices):
-        """Given connect qubit indices and type of entangler, generate the entangling layer
-        (i.e large matrix/tensor product)"""
+        """
+        Given connect qubit indices and type of entangler, generate the entangling layer
+        Returns:
+            entangling_layer: qutip.qobj.Qobj
+            A 16 by 16 (or 2*4 by 2*4 in tensor product space) matrix that represents
+            the entangling layer operation.
+        """
         if self._entangler == "cnot":
             gate = qt.qip.operations.cnot
             gate_list = [gate(self._n_qubits, j, k) for j, k in entangling_gate_indices]
@@ -94,7 +116,13 @@ class QuantumCircuit():
         return entangling_layer
 
     def _gen_intial_state(self):
-        """Apply initial hadamard rotation to basis state of n_qubits |0>"""
+        """
+        Apply initial hadamard rotation to basis state of n_qubits in |0> state
+        Returns:
+            applied_rotations: qutip.qobj.Qobj
+            A ket representing the action of initial hadamard gate on basis stae,
+            16 by 1 / 2*4 by 2*0 vector.
+        """
         levels = 2 #is levels qubit dimension i.e always 2
         initial_state = qt.tensor([qt.basis(levels, 0) for i in range(self._n_qubits)])
         hadamards = [qt.qip.operations.ry(np.pi / 4) for i in range(self._n_qubits)]
@@ -102,8 +130,13 @@ class QuantumCircuit():
         return applied_rotations
 
     def _add_to_rotation_operations(self, angle, ini_pauli_sigma, rot_op):
-        """Operates in place on rot_op and appends the angle parameterised correct rotation gate
-        to rot_op."""
+        """
+        For given angle and type of Pauli matrix, make the correct rotation gate
+        from qutip and append it in place to the rot_op array.
+        Returns:
+            rot_op [qt.qobj.Qobj, ...]
+            A list of each rotation gate, a qutip operator matrix.
+        """
         ops = qt.qip.operations
         if ini_pauli_sigma == 1: #X
             rot_op.append(ops.rx(angle))
@@ -114,6 +147,9 @@ class QuantumCircuit():
         return rot_op
 
     def _multiply_in_derivative(self, ini_pauli_sigma, qubit, circuit_state):
+        """
+        Still don't know why this does what it does, fill this later.
+        """
         if ini_pauli_sigma == 1: #X
             deriv = (-1j * self._opX[qubit] / 2)
         elif ini_pauli_sigma == 2: #Y
@@ -123,6 +159,13 @@ class QuantumCircuit():
         return deriv * circuit_state
 
     def run(self):
+        """
+        First, generate the entangling layer and initial rotators. On -1th
+        iteration calculate inital quantum state then for next n_param iterations
+        calculate the gradient for that parameter, which is needed to optimise
+        the parameter. Returns (i.e mutates) the gradient state list and gradient
+        list and outputs the energy of the quantum state.
+        """
         entangling_gate_indices = self._gen_entanglement_indices()
         entangling_layer = self._gen_entangling_layer(entangling_gate_indices)
 
@@ -148,13 +191,12 @@ class QuantumCircuit():
                 circuit_state = entangling_layer * circuit_state
 
             if param == -1:
-                ground_state = qt.Qobj(circuit_state)
+                #cost function given by <\psi|H|\psi>
+                ground_state = qt.Qobj(circuit_state) #state generated by circuit
                 energy = qt.expect(self._H, ground_state)
                 print(f"Energy of state is {energy}")
             else:
-                self._gradient_state_list.append(qt.Qobj(circuit_state))
+                self._gradient_state_list.append(qt.Qobj(circuit_state)) #state with gradient applied for p-th parameter
+                #gradient of circuit is given by 2*real(<\psi|H|\partial_p\psi>)
                 overlap = ground_state.overlap(self._H * circuit_state)
                 self._gradient_list[param] = 2 * np.real(overlap)
-                
-
-        
