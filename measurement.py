@@ -48,9 +48,13 @@ class Measurements():
         return qfi_matrix
 
     def get_effective_quantum_dimension(self, cutoff_eigvals):
+        """
+        Get EFD by counting the # of non-zero eigenvalues of the QFI matrix.
+        Returns:
+            eff_quant_dim = Int
+        """
         QFI = self._get_QFI()
         eigvals, eigvecs = scipy.linalg.eigh(QFI)
         nonzero_eigvals = eigvals[eigvals > cutoff_eigvals]
         eff_quant_dim = len(nonzero_eigvals)
         return eff_quant_dim
-        

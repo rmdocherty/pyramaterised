@@ -17,7 +17,10 @@ class QuantumCircuit():
     QuantumCircuit.
 
     Class to generate a $layer deep VQC with $n_qubits in $topology layout using
-    $entanglers. Can then generate circuit from set params.
+    $entanglers. Can then generate circuit from set params. For usage see test.py,
+    but initialise w/ circuit = QuantumCircuit(4, 3 "chain", "cnot") to intialise
+    a 4 qubit, 3 layer chain connected, CNOT entangled PQC. Then run it with
+    circuit.run() to generate gradients for each param.
     """
 
     def __init__(self, n_qubits, layers, topology, entangler):
