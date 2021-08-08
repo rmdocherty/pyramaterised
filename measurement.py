@@ -58,3 +58,27 @@ class Measurements():
         nonzero_eigvals = eigvals[eigvals > cutoff_eigvals]
         eff_quant_dim = len(nonzero_eigvals)
         return eff_quant_dim
+
+    def expressibility(self, sample_N):
+        F_samples = []
+        N = 2 ** self._QC._n_qubits
+        for i in range(sample_N):
+            #print(i)
+            self._QC.gen_quantum_state()
+            state1 = self._QC._quantum_state #psi theta
+            self._QC.gen_quantum_state()
+            state2 = self._QC._quantum_state #psi phi
+            sqrt_F = state1.overlap(state2)
+            F = np.conjugate(sqrt_F) * sqrt_F
+            #print(type(F))
+            F_samples.append(np.real(F))
+        prob, F = np.histogram(F_samples, bins="fd")
+        print(prob)
+        expr = 0
+        for index, P_pqc in enumerate(prob):
+            #print(index)
+            P_haar = (N - 1) * (1 - F[index]) ** (N - 2)
+            expr += P_pqc * np.log(P_pqc / P_haar)
+        print(f"Expressibility is {expr}")
+        return expr
+

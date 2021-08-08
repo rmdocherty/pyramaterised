@@ -25,3 +25,4 @@ q.run() #should ouput 0.46135870050914374
 M = Measurements(q)
 EFD = M.get_effective_quantum_dimension(10**-12)
 print(f"Effective quantum dimension is {EFD}")
+expr = M.expressibility(1000)
