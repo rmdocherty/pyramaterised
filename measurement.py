@@ -30,7 +30,7 @@ class Measurements():
         #get all single elements first
         single_qfi_elements = np.zeros(n_params, dtype=np.complex128)
         for param in range(n_params):
-            overlap = self._QC._ground_state.overlap(grad_state_list[param])
+            overlap = self._QC._quantum_state.overlap(grad_state_list[param])
             single_qfi_elements[param] = overlap
 
         qfi_matrix = np.zeros([n_params, n_params])
