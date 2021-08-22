@@ -22,7 +22,8 @@ print(q2._gen_entanglement_indices())
 q.run() #should ouput 0.46135870050914374
 
 #%%
+q3 = QuantumCircuit(4, 1, "chain", "cnot") #single layer as in paper?
 M = Measurements(q)
-EFD = M.get_effective_quantum_dimension(10**-12)
-print(f"Effective quantum dimension is {EFD}")
-expr = M.expressibility(1000)
+#EFD = M.get_effective_quantum_dimension(10**-12)
+#print(f"Effective quantum dimension is {EFD}")
+expr = M.expressibility(5000)
