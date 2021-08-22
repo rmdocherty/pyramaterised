@@ -9,6 +9,7 @@ import qutip as qp
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+from helper_functions import pretty_subplot
 
 
 class Measurements():
@@ -94,20 +95,42 @@ class Measurements():
         return prob, F
 
     def expressibility(self, sample_N, graphs=False):
+        """
+        Expressibility.
+
+        Given a PQC circuit, calculate $sample_N state pairs with randomised
+        parameters and their overlap integral. Use that to generate a Fidelity
+        distribution and also generate the fidelity of the Haar state using the
+        analytic expression. From both of those calculate the KL diveregence =
+        relative entropy = Expressibility and return it.
+
+        Parameters:
+            sample_N: int
+                Number of random state sample pairs to generate.
+            graphs: bool, default = False
+                Whether or not to plot a graph of PQC fidelity distribution vs
+                Haar distribution.
+        Returns:
+            expr: float
+                The D_KL divergence of the fidelity distribution of the PQC
+                vs the distribution from the Haar expression.
+        """
         N = 2 ** self._QC._n_qubits
+
         F_samples = self._gen_f_samples(sample_N)
-        prob, F = self._gen_histo(F_samples, graphs=True)
-        expr = 0
-        haar = (N - 1) * ((1 - F) ** (N - 2))
+        P_pqc, F = self._gen_histo(F_samples)
+
+        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
         P_haar = haar / sum(haar) #do i need to normalise this?
-        for index, P_pqc in enumerate(prob): #f = 1 at last bin so this is div by 0. fix by doing bin middles instead
-            log = np.log(P_pqc / P_haar[index]) if P_pqc > 0 else 0
-            expr += P_pqc * log
+
+        P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
+        log = np.log(P_bar_Q) #take natural log of array
+        expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
+
         if graphs is True:
-            plt.plot(F, P_haar, label="Haar", color="C0", alpha=0.7)
-            plt.plot(F, prob, label="Quantum state", color="C1", alpha=0.7)
-            plt.xlabel("Fidelity")
-            plt.ylabel("Probability")
-            plt.legend(fontsize=20)
+            plt.figure("Expressibility")
+            plt.plot(F, P_haar, label="Haar", color="C0", alpha=0.7, marker="x")
+            plt.plot(F, P_pqc, label="Quantum state", color="C1", alpha=0.7, marker=".")
+            pretty_subplot(plt.gca(), "Fidelity", "Probability", "Fidelity vs probability", 20)
         print(f"Expressibility is {expr}")
         return expr

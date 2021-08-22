@@ -66,9 +66,9 @@ class QuantumCircuit():
         rotation (X,Y,Z) and the angle (randomised between 0 and 2 pi).
         Returns:
             initial_angles: [float, ...]
-            List of angles that a given gate rotates by, between 0 and 2 pi
+                List of angles that a given gate rotates by, between 0 and 2 pi
             initial_pauli: [int, ...]
-            List of what type of Pauli matrix a given rotation is (i.e X, Y, Z)
+                List of what type of Pauli matrix a given rotation is (i.e X, Y, Z)
         """
         size = [self._layers, self._n_qubits]
         #angles for circuit - this is the theta/parameters
@@ -82,8 +82,8 @@ class QuantumCircuit():
         Generate the qubit index pairs for connected qubits based on QC topology
         Returns:
             entangling_gate_indices: [[int, int], ...]
-            A list of list (pairs) of integers that represent gate connections
-            in the QC.
+                A list of list (pairs) of integers that represent gate connections
+                in the QC.
         TODO: add the alternating topolgy here! -how does it work for odd n_qubit?
         """
         if self._topology == "chain":
@@ -103,8 +103,8 @@ class QuantumCircuit():
         Given connect qubit indices and type of entangler, generate the entangling layer
         Returns:
             entangling_layer: qutip.qobj.Qobj
-            A 16 by 16 (or 2*4 by 2*4 in tensor product space) matrix that represents
-            the entangling layer operation.
+                A 16 by 16 (or 2*4 by 2*4 in tensor product space) matrix that represents
+                the entangling layer operation.
         """
         if self._entangler == "cnot":
             gate = qt.qip.operations.cnot
@@ -123,8 +123,8 @@ class QuantumCircuit():
         Apply initial hadamard rotation to basis state of n_qubits in |0> state
         Returns:
             applied_rotations: qutip.qobj.Qobj
-            A ket representing the action of initial hadamard gate on basis stae,
-            16 by 1 / 2**4 by 2**0 vector.
+                A ket representing the action of initial hadamard gate on basis stae,
+                16 by 1 / 2**4 by 2**0 vector.
         """
         levels = 2 #is levels qubit dimension i.e always 2
         initial_state = qt.tensor([qt.basis(levels, 0) for i in range(self._n_qubits)])
@@ -138,7 +138,7 @@ class QuantumCircuit():
         from qutip and append it in place to the rot_op array.
         Returns:
             rot_op [qt.qobj.Qobj, ...]
-            A list of each rotation gate, a qutip operator matrix.
+                A list of each rotation gate, a qutip operator matrix.
         """
         ops = qt.qip.operations
         if ini_pauli_sigma == 1: #X
@@ -164,6 +164,9 @@ class QuantumCircuit():
         return deriv * circuit_state
 
     def _update_circuit_state(self, param, ini_ang, ini_pauli, entng_layer):
+        """
+        
+        """
         counter = 0
         circuit_state = self._gen_intial_state() #this resets circuit each time so not sequentially updating every param
 
@@ -184,6 +187,29 @@ class QuantumCircuit():
         return circuit_state
 
     def gen_quantum_state(self, energy_out=True):
+        """
+        gen_quantum_state.
+
+        Generate the initial circuit state / quantum state of the PQC - first
+        randomise rotation gate types and angles and get list of qubit connections
+        based on supplied gates and entangler. Then update the circuit state w/out
+        multiplying in derivative (as we don't want to optimise w.r.t a parameter).
+        Then if energy_out is true calculate expectation energy and output it.
+
+        Parameters:
+            energy_out: bool, default=True
+                Whether or not to calculate energy of initial circuit/quantum
+                circuit state.
+        Returns:
+            entangling_layer: qutip.qobj.Qobj
+                A 16 by 16 (or 2*4 by 2*4 in tensor product space) matrix that represents
+                the entangling layer operation.
+            initial_angles: [float, ...]
+                List of angles that a given gate rotates by, between 0 and 2 pi
+            initial_pauli: [int, ...]
+                List of what type of Pauli matrix a given rotation is (i.e X, Y, Z)
+
+        """
         entangling_gate_indices = self._gen_entanglement_indices()
         entangling_layer = self._gen_entangling_layer(entangling_gate_indices)
 

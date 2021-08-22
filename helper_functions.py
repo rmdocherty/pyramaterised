@@ -34,3 +34,12 @@ def natural_num_check(N, param_name):
     if N < 0:
         raise Exception(f"{param_name} must be greater than 0.")
     return N
+
+
+def pretty_subplot(axis, x_label, y_label, title, fontsize):  #formatting graphs
+    axis.set_xlabel(x_label, fontsize=fontsize)
+    axis.set_title(title, fontsize=fontsize + 2)
+    axis.set_ylabel(y_label, fontsize=fontsize)
+    axis.tick_params(labelsize=fontsize)
+    axis.set_facecolor("#fffcf5")
+    axis.legend(fontsize=fontsize-2)

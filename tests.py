@@ -26,4 +26,4 @@ q3 = QuantumCircuit(4, 1, "chain", "cnot") #single layer as in paper?
 M = Measurements(q)
 #EFD = M.get_effective_quantum_dimension(10**-12)
 #print(f"Effective quantum dimension is {EFD}")
-expr = M.expressibility(5000)
+expr = M.expressibility(5000, graphs=True)
