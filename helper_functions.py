@@ -42,4 +42,4 @@ def pretty_subplot(axis, x_label, y_label, title, fontsize):  #formatting graphs
     axis.set_ylabel(y_label, fontsize=fontsize)
     axis.tick_params(labelsize=fontsize)
     axis.set_facecolor("#fffcf5")
-    axis.legend(fontsize=fontsize-2)
+    #axis.legend(fontsize=fontsize-2)
