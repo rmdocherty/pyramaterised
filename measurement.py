@@ -91,7 +91,7 @@ class Measurements():
         prob, edges = np.histogram(F_samples, bins=75, range=(0, 1))
         prob = prob / sum(prob) #normalise by sum of prob or length?
         #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
-        F = np.array([(edges[0] + edges[1]) / 2] + [(edges[i - 1] + edges[i]) / 2 for i in range(2, len(edges))])
+        F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
         return prob, F
 
     def expressibility(self, sample_N, graphs=False):

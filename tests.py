@@ -63,7 +63,7 @@ class CircuitB(SingleQubit):
         hadamard = qt.qip.operations.ry(np.pi / 4)
         angle1 = random.random() * 2 * np.pi
         R_z = qt.qip.operations.rz(angle1)
-        angle2 = random.random() * 2 * np.pi
+        angle2 = random.random() * 2 * np.pi #this isn;t right, needs tobe accodring to haar / arcsin
         R_x = qt.qip.operations.rx(angle2)
         quantum_state = R_x * R_z * hadamard * self._initial_state
         self._quantum_state = qt.Qobj(quantum_state)
@@ -71,21 +71,8 @@ class CircuitB(SingleQubit):
 
 
 class Unitary(SingleQubit):
-    def _gen_unitary(self):
-        theta = random.random() * np.pi
-        phi = random.random() * 2 * np.pi
-        lamba = random.random() * 2 * np.pi
-        cos = np.cos(theta / 2)
-        sin = np.sin(theta / 2)
-        #expression for arbitary unitary gate on single qubit
-        U = [[cos, -np.exp(+1j * lamba) * sin], [np.exp(+1j * phi) * sin, np.exp(+1j * lamba + +1j * phi) * cos]]
-        nu = np.array(U)
-        return nu
-
     def gen_quantum_state(self, energy_out=False):
-        unitary = self._gen_unitary() #for sigle qubit is 2x2 matrix
-        quantum_state = unitary * self._initial_state
-        self._quantum_state = qt.Qobj(quantum_state)
+        self._quantum_state = qt.random_objects.rand_unitary(2) * self._initial_state
         return 0
 
 
@@ -105,7 +92,7 @@ circuit_B_expr.expressibility(1000, graphs=True) #shoud be around 0.02 - isn't a
 #%%
 U = Unitary()
 unitary_expr = Measurements(U)
-unitary_expr.expressibility(1000, graphs=True) #shoud be around 0.007 - order of magnitude too large
+unitary_expr.expressibility(1000, graphs=True) #shoud be around 0.007 - now works!
 #%% GET DATA OF EXPR VS DEPTH FOR DIFF ENTANGLERS
 entangler_expr = []
 for entangler in ["cnot", "cphase", "iswap"]:
