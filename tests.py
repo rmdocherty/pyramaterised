@@ -17,7 +17,7 @@ import random
 random.seed(1) #for reproducibility
 
 #%% LOOK AT ENTANGLEMENT TOPOLOGIES
-q = QuantumCircuit(4, 3, "chain", "cnot")
+q = QuantumCircuit(4, 1, "chain", "cnot")
 print("4 qubit chain topology connected indices")
 print(q._gen_entanglement_indices())
 
@@ -76,6 +76,25 @@ class Unitary(SingleQubit):
         return 0
 
 
+class BellState():
+    def __init__(self):
+        self._initial_state = qt.bell_state("00")
+        self._n_qubits = 2
+
+    def gen_quantum_state(self, energy_out=False):
+        self._quantum_state = self._initial_state
+        return 0
+
+
+class Fock():
+    def __init__(self):
+        self._initial_state = qt.basis([2, 2])
+        self._n_qubits = 2
+
+    def gen_quantum_state(self, energy_out=False):
+        self._quantum_state = self._initial_state
+        return 0
+
 #%%
 idle = IdleCircuit()
 idle_circuit_expr = Measurements(idle)
@@ -93,6 +112,8 @@ circuit_B_expr.expressibility(1000, graphs=True) #shoud be around 0.02 - isn't a
 U = Unitary()
 unitary_expr = Measurements(U)
 unitary_expr.expressibility(1000, graphs=True) #shoud be around 0.007 - now works!
+#%%
+M.expressibility(5000, graphs=True)
 #%% GET DATA OF EXPR VS DEPTH FOR DIFF ENTANGLERS
 entangler_expr = []
 for entangler in ["cnot", "cphase", "iswap"]:
@@ -114,3 +135,19 @@ pretty_subplot(plt.gca(), "Circuit Depth", "Expr, $D_{KL}$", \
                "Expressibility vs Depth for 4 qubit chain topology", 20)
 plt.gca().set_ylim(0, 1)
 plt.gca().legend(fontsize=18)
+
+#%%
+bell_state = BellState()
+ent_M = Measurements(bell_state)
+entanglement = ent_M.entanglement(1)
+print(entanglement)
+#%%
+unentangled = Fock()
+uent_M = Measurements(unentangled)
+unentanglement = uent_M.entanglement(1)
+print(unentanglement)
+#%%
+test_ent = M.entanglement(10000, graphs=(True))
+mean, std = np.mean(test_ent), np.std(test_ent)
+print(test_ent)
+print(f"Mean is {mean} +/- {std} ")

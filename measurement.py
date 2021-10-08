@@ -134,3 +134,42 @@ class Measurements():
             pretty_subplot(plt.gca(), "Fidelity", "Probability", "Fidelity vs probability", 20)
         print(f"Expressibility is {expr}")
         return expr
+    
+    def _gen_entanglement_samples(self, sample_N):
+        samples = []
+        for i in range(sample_N):
+            self._QC.gen_quantum_state(energy_out=False)
+            samples.append(self._QC._quantum_state)
+        return samples
+
+    def entanglement(self, sample_N, graphs=False):
+        """
+        Entanglement.
+
+        Given a PQC circuit $sample_N states and calculate the entanglement using
+        the partial trace of the system.
+
+        Parameters:
+            sample_N: int
+                Number of random state sample pairs to generate.
+            graphs: bool, default = False
+                Whether or not to plot a graph of PQC fidelity distribution vs
+                Haar distribution.
+        Returns:
+            ent: list of floats
+                List of $sample_N entanglement Q values for the PQC.
+        """
+        n = self._QC._n_qubits
+        samples = self._gen_entanglement_samples(sample_N)
+        ent = []
+        for system in samples:
+            summand = 0
+            for k in range(n):
+                density_matrix = system.ptrace(k)
+                density_matrix *= density_matrix
+                summand += density_matrix.tr()
+            Q = 2 * (1 - (1 / n) * summand)
+            ent.append(Q)
+        if graphs == True:
+            plt.hist(ent, bins="fd")
+        return ent
