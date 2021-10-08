@@ -151,3 +151,6 @@ test_ent = M.entanglement(10000, graphs=(True))
 mean, std = np.mean(test_ent), np.std(test_ent)
 print(test_ent)
 print(f"Mean is {mean} +/- {std} ")
+#%%
+test_magic = ent_M.entropy_of_magic()
+print(test_magic)

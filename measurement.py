@@ -5,10 +5,11 @@ Created on Sat Aug  7 21:20:44 2021
 
 @author: ronan
 """
-import qutip as qp
+import qutip as qt
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+from itertools import product
 from helper_functions import pretty_subplot
 
 
@@ -170,6 +171,48 @@ class Measurements():
                 summand += density_matrix.tr()
             Q = 2 * (1 - (1 / n) * summand)
             ent.append(Q)
-        if graphs == True:
+        if graphs is True:
             plt.hist(ent, bins="fd")
         return ent
+    
+    def _gen_pauli_group(self):
+        N = self._QC._n_qubits
+        pauli_list = [qt.qeye(2), qt.sigmax(), qt.sigmay(), qt.sigmaz()]
+        strings = product(pauli_list, repeat=N)
+        P_n = [qt.tensor(list(s)) for s in strings]
+        return P_n
+
+    def _compute_projector(self):
+        N = self._QC._n_qubits
+        P_n = self._gen_pauli_group()
+        empty = qt.Qobj(np.array([[0, 0], [0, 0]]))
+        proj = qt.tensor([qt.tensor([empty for i in range(N)]) for i in range(4)])
+        for P in P_n:
+            proj += qt.tensor([P for i in range(4)])
+        proj = proj * (2**N)**-2
+        return proj
+
+    def old_entropy_of_magic(self):
+        psi = self._QC._quantum_state
+        N = self._QC._n_qubits
+        d = (2**N)**-2
+        Q = self._compute_projector()
+        density_matrix = psi * psi.dag()
+        tensor = qt.tensor([density_matrix for i in range(4)])
+        trace = (Q * tensor).tr()
+        magic = -1 * np.log(d * trace)
+        return magic
+    
+    def entropy_of_magic(self):
+        P_n = self._gen_pauli_group()
+        psi = self._QC._quantum_state
+        N = self._QC._n_qubits
+        d = 2**N
+        xi_p = []
+        for P in P_n:
+            xi_p.append((d**-1) * qt.expect(P, psi)**2)
+        norm = np.linalg.norm(xi_p, ord=2)
+        magic = -1 * np.log(d*norm)
+        return magic
+        
+        
