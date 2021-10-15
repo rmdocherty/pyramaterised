@@ -16,15 +16,16 @@ import matplotlib.pyplot as plt
 import qutip as qt
 import numpy as np
 import random
-from PQC import *
+import PQC_lib as P
 
 random.seed(1) #for reproducibility
 
 #%% LOOK AT ENTANGLEMENT TOPOLOGIES
-q = QuantumCircuit(4, 1, "chain", "cnot")
+q = QuantumCircuit(4, 3, "chain", "cnot")
 print("4 qubit chain topology connected indices")
 print(q._gen_entanglement_indices())
 
+#%%
 print("5 qubit chain topology connected indices")
 q2 = QuantumCircuit(5, 3, "chain", "cnot")
 print(q2._gen_entanglement_indices())
@@ -163,8 +164,30 @@ print(test_magic)
 #%%
 """====================NEW PQC TESTS=================="""
 #%%
-circuit_A = PQC(1, 1)
-layer = [H(0, np.pi/4), R_x(0, 0)]
+idle_circuit = P.PQC(1, 1)
+layer = [P.PRot(0, 1)]
+idle_circuit.set_gates(layer)
+idle_circuit_m = Measurements(idle_circuit)
+idle_circuit_m.expressibility(5000, graphs=True)
+
+#%%
+circuit_A = P.PQC(1, 1)
+layer = [P.H(0, 1), P.R_x(0, 1)]
 circuit_A.set_gates(layer)
 circuit_A_expr = Measurements(circuit_A)
-circuit_A_expr.expressibility(1000, graphs=True)
+circuit_A_expr.expressibility(5000, graphs=True)
+#%%
+original_circuit = P.PQC(4,3)
+original_circuit.set_initialiser(P.H)
+rotate_layer = []
+options = [P.R_x, P.R_y, P.R_z]
+for i in range(4):
+    R = random.choice(options)
+    rotate_layer.append(R(i, 4))
+print(rotate_layer)
+layer = rotate_layer + [P.Chain(P.CNOT, 4)]
+original_circuit.set_gates(layer)
+original_circuit.gen_quantum_state()
+print(original_circuit)
+e = original_circuit.energy()
+print(e)
