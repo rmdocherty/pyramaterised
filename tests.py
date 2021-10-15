@@ -5,6 +5,8 @@ Created on Sat Aug  7 18:12:45 2021
 
 @author: ronan
 
+
+
 Does our QC code match up to the results from Tobias' code?
 """
 from QC import QuantumCircuit
@@ -14,6 +16,8 @@ import matplotlib.pyplot as plt
 import qutip as qt
 import numpy as np
 import random
+from PQC import *
+
 random.seed(1) #for reproducibility
 
 #%% LOOK AT ENTANGLEMENT TOPOLOGIES
@@ -147,10 +151,20 @@ uent_M = Measurements(unentangled)
 unentanglement = uent_M.entanglement(1)
 print(unentanglement)
 #%%
-test_ent = M.entanglement(10000, graphs=(True))
+test_ent = M.entanglement(5000, graphs=(True))
 mean, std = np.mean(test_ent), np.std(test_ent)
 print(test_ent)
 print(f"Mean is {mean} +/- {std} ")
 #%%
 test_magic = ent_M.entropy_of_magic()
 print(test_magic)
+
+#%%
+#%%
+"""====================NEW PQC TESTS=================="""
+#%%
+circuit_A = PQC(1, 1)
+layer = [H(0, np.pi/4), R_x(0, 0)]
+circuit_A.set_gates(layer)
+circuit_A_expr = Measurements(circuit_A)
+circuit_A_expr.expressibility(1000, graphs=True)
