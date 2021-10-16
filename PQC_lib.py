@@ -14,8 +14,11 @@ from helper_functions import genFockOp, flatten, prod, general_prod
 rng = np.random.default_rng(1)
 
 
+def iden(N):
+    return qt.tensor([qt.qeye(2) for i in range(N)])
+
+
 class Gate():
-    n_qubit = 4
 
     def __mul__(self, b):
         if isinstance(b, Gate):
@@ -44,6 +47,12 @@ class PRot(Gate):
         focks = [genFockOp(self._gate(), i, self._q_N, 2) for i in n_qubit_range]
         derivs = -1j * focks[self._q_on] / 2
         return derivs
+
+    def __repr__(self):
+        name = type(self).__name__
+        angle = self._theta
+        string = f"{name}({angle:.2f})@q{self._q_on}"
+        return string
 
 
 class R_x(PRot):
@@ -78,7 +87,10 @@ class EntGate(Gate):
 
     def _set_op(self):
         self._gate = qt.qeye
-        return qt.qeye(Gate.n_qubit)
+        return qt.qeye(self._q_N)
+
+    def __repr__(self):
+        return f"{type(self).__name__}@q{self._q_1},q{self._q_2}"
 
 
 class CNOT(EntGate):
@@ -100,8 +112,9 @@ class iSWAP(EntGate):
 
 
 class Chain(EntGate):
-    def __init__(self, entangler):
+    def __init__(self, entangler, q_N):
         self._entangler = entangler
+        self._q_N = q_N
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -109,13 +122,20 @@ class Chain(EntGate):
         top_connections = [[2 * j, 2 * j + 1] for j in range(N // 2)]
         bottom_connections = [[2 * j + 1, 2 * j + 2] for j in range((N - 1) // 2)]
         indices = top_connections + bottom_connections
-        entangling_layer = [self._entangler(index_pair) for index_pair in indices][::-1]
-        return prod(entangling_layer)
+        entangling_layer = [self._entangler(index_pair, N) for index_pair in indices][::-1]
+        out = iden(N)
+        for i in entangling_layer:
+            out = i * out
+        return out
+
+    def __repr__(self):
+        return f"CHAIN connected {self._entangler.__name__}s"
 
 
 class AllToAll(EntGate):
-    def __init__(self, entangler):
+    def __init__(self, entangler, q_N):
         self._entangler = entangler
+        self._q_N = q_N
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -125,21 +145,28 @@ class AllToAll(EntGate):
             for j in range(i + 1, N):
                 nested_temp_indices.append(rng.perumtation([i, j]))
         indices = flatten(nested_temp_indices)
-        entangling_layer = [self._entangler(index_pair) for index_pair in indices][::-1]
-        return prod(entangling_layer)
+        entangling_layer = [self._entangler(index_pair, N) for index_pair in indices][::-1]
+        out = iden(N)
+        for i in entangling_layer:
+            out = i * out
+        return out
+
+    def __repr__(self):
+        return f"ALL connected {self._entangler.__name__}s"
 
 
 class PQC():
     def __init__(self, n_qubits, n_layers):
-        Gate.n_qubits = n_qubits
         self._n_qubits = n_qubits
         self._n_layers = n_layers
-        self.initial_layer = qt.qeye([self._n_qubits, self._n_qubits])
+        self.initial_layer = []#iden(n_qubits)
 
-    def set_initialiser(self, layer):
-        self.initial_layer = layer
+    def set_initialiser(self, init_gate):
+        N = self._n_qubits
+        self.initial_layer = [init_gate(i, N) for i in range(N)]
 
     def set_gates(self, layer):
+        self.layer = layer
         layers = layer * self._n_layers
         self.gates = layers
 
@@ -154,8 +181,8 @@ class PQC():
 
     def initialise(self):
         circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
-        #for i in self.initial_layer:
-        #    circuit_state = i * circuit_state
+        for i in self.initial_layer: #initial stuff still not working! Think it may be to do with when default initial layer is used it turns thing nto np array
+            circuit_state = i * circuit_state
         self.set_params()
         for g in self.gates:
             circuit_state = g * circuit_state
@@ -163,4 +190,20 @@ class PQC():
 
     def gen_quantum_state(self, energy_out=False):
         self._quantum_state = qt.Qobj(self.initialise())
+        if energy_out is True:
+            e = self.energy()
+            print(f"Energy of state is {e}")
         return self._quantum_state
+
+    def energy(self):
+        Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
+        Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
+        H = Z0 * Z1
+        energy = qt.expect(H, self._quantum_state)
+        return energy
+
+    def __repr__(self):
+        line1 = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"
+        line2 = f"Initial layer:\n{self.initial_layer}\n"
+        line3 = f"Repeated layer: \n{self.layer}"
+        return line1 + line2 + line3

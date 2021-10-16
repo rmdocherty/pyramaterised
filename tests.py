@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import qutip as qt
 import numpy as np
 import random
-import PQC_lib as P
+import PQC_lib as pqc
 
 random.seed(1) #for reproducibility
 
@@ -164,30 +164,43 @@ print(test_magic)
 #%%
 """====================NEW PQC TESTS=================="""
 #%%
-idle_circuit = P.PQC(1, 1)
-layer = [P.PRot(0, 1)]
+idle_circuit = pqc.PQC(1, 1)
+layer = [pqc.PRot(0, 1)]
 idle_circuit.set_gates(layer)
 idle_circuit_m = Measurements(idle_circuit)
 idle_circuit_m.expressibility(5000, graphs=True)
 
 #%%
-circuit_A = P.PQC(1, 1)
-layer = [P.H(0, 1), P.R_x(0, 1)]
+circuit_A = pqc.PQC(1, 1)
+layer = [pqc.H(0, 1), pqc.R_x(0, 1)]
+circuit_A.set_initialiser(pqc.PRot)
 circuit_A.set_gates(layer)
 circuit_A_expr = Measurements(circuit_A)
 circuit_A_expr.expressibility(5000, graphs=True)
 #%%
-original_circuit = P.PQC(4,3)
-original_circuit.set_initialiser(P.H)
+original_circuit = pqc.PQC(4,3)
+original_circuit.set_initialiser(pqc.H)
 rotate_layer = []
-options = [P.R_x, P.R_y, P.R_z]
+options = [pqc.R_x, pqc.R_y, pqc.R_z]
 for i in range(4):
     R = random.choice(options)
     rotate_layer.append(R(i, 4))
 print(rotate_layer)
-layer = rotate_layer + [P.Chain(P.CNOT, 4)]
+layer = rotate_layer + [pqc.Chain(pqc.CNOT, 4)]
 original_circuit.set_gates(layer)
 original_circuit.gen_quantum_state()
 print(original_circuit)
 e = original_circuit.energy()
 print(e)
+
+#%%
+circuit_9 = pqc.PQC(4, 1)
+layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
+         pqc.Chain(pqc.CPHASE, 4), 
+         pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
+circuit_A.set_initialiser(pqc.PRot)
+circuit_9.set_gates(layer)
+circuit_9.gen_quantum_state()
+circuit_9_m = Measurements(circuit_9)
+circuit_9_m.expressibility(5000, graphs=True)
+circuit_9_m.entanglement(5000, graphs=True)
