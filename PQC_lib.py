@@ -73,10 +73,14 @@ class R_z(PRot):
         return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
-class H(R_y):
+class H(PRot):
     def set_theta(self, angle):
-        self._theta = np.pi / 4
+        self._theta = np.pi / 2
         self._operation = self._set_op()
+
+    def _set_op(self):
+        self._gate = qt.qip.operations.ry
+        return qt.qip.operations.x_gate(self._q_N, self._q_on) * self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class EntGate(Gate):
@@ -101,11 +105,11 @@ class CNOT(EntGate):
 
 class CPHASE(EntGate):
     def _set_op(self):
-        gate = qt.qip.operations.csign
+        gate = qt.qip.operations.cz_gate
         return gate(self._q_N, self._q1, self._q2)
 
 
-class iSWAP(EntGate):
+class sqrtiSWAP(EntGate):
     def _set_op(self):
         gate = qt.qip.operations.sqrtiswap
         return gate(self._q_N, self._q1, self._q2)
