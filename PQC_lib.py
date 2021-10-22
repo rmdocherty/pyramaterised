@@ -9,6 +9,7 @@ Created on Fri Oct 15 11:22:14 2021
 import qutip as qt
 import numpy as np
 from itertools import chain
+from copy import deepcopy
 from helper_functions import genFockOp, flatten, prod, general_prod
 
 rng = np.random.default_rng(1)
@@ -19,6 +20,9 @@ def iden(N):
 
 
 class Gate():
+    """Parent class for all gate types to inherit from - describes the behaviour
+    when any Gate (or derived classes) is multiplied. Want to ensure that the
+    gate always uses its underlying qutip gate representation when multiplied."""
 
     def __mul__(self, b):
         if isinstance(b, Gate):
@@ -28,6 +32,10 @@ class Gate():
 
 
 class PRot(Gate):
+    """A class to described how parametrised rotation gates work - they have a
+    qubit they operate on, a total number of qubits in the system (so gate can
+    be extended to that dimension) and an angle that the gate rotates by."""
+
     def __init__(self, q_on, q_N):
         self._q_on = q_on
         self._q_N = q_N
@@ -35,7 +43,9 @@ class PRot(Gate):
         self._operation = self._set_op()
 
     def _set_op(self):
+        """Change this for different PRots to change their behaviour"""
         self._gate = qt.qeye
+        self._pauli = qt.qeye(2)
         return qt.qeye([self._q_N, self._q_N])
 
     def set_theta(self, theta):
@@ -43,10 +53,12 @@ class PRot(Gate):
         self._operation = self._set_op()
 
     def derivative(self):
-        n_qubit_range = range(0, self._q_N)
-        focks = [genFockOp(self._gate(), i, self._q_N, 2) for i in n_qubit_range]
-        derivs = -1j * focks[self._q_on] / 2
-        return derivs
+        """Take the derivative of the PRot - this generates the pauli gate
+        associated with the gate type (i.e R_x -> sigma_x) operating on given
+        qubit and multiplies it by j/2."""
+        focks = genFockOp(self._pauli(), self._q_on, self._q_N, 2)
+        deriv = -1j * focks / 2
+        return deriv
 
     def __repr__(self):
         name = type(self).__name__
@@ -58,18 +70,21 @@ class PRot(Gate):
 class R_x(PRot):
     def _set_op(self):
         self._gate = qt.qip.operations.rx
+        self._pauli = qt.sigmax()
         return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class R_y(PRot):
     def _set_op(self):
         self._gate = qt.qip.operations.ry
+        self._pauli = qt.sigmay()
         return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class R_z(PRot):
     def _set_op(self):
         self._gate = qt.qip.operations.rz
+        self._pauli = qt.sigmaz()
         return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
@@ -79,11 +94,18 @@ class H(PRot):
         self._operation = self._set_op()
 
     def _set_op(self):
-        self._gate = qt.qip.operations.ry
-        return qt.qip.operations.x_gate(self._q_N, self._q_on) * self._gate(self._theta, N=self._q_N, target=self._q_on)
+        """Hadamard gate is just sigma_x * R_y(pi/2)"""
+        ops = qt.qip.operations
+        self._gate = ops.ry
+        return ops.x_gate(self._q_N, self._q_on) * self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class EntGate(Gate):
+    """A class to described how entangling gates work - they have the
+    qubits they operate on (control and target) and a total number of qubits
+    in the system. Works the same way as rotation gates, i.e changing the
+    _set_op() method to use the right qutip gate."""
+
     def __init__(self, qs_on, q_N):
         self._q1, self._q2 = qs_on[0], qs_on[1]
         self._q_N = q_N
@@ -94,7 +116,7 @@ class EntGate(Gate):
         return qt.qeye(self._q_N)
 
     def __repr__(self):
-        return f"{type(self).__name__}@q{self._q_1},q{self._q_2}"
+        return f"{type(self).__name__}@q{self._q1},q{self._q2}"
 
 
 class CNOT(EntGate):
@@ -105,6 +127,7 @@ class CNOT(EntGate):
 
 class CPHASE(EntGate):
     def _set_op(self):
+        """The CPHASE gate not a real cphase gate, defined in papers as CZ gate."""
         gate = qt.qip.operations.cz_gate
         return gate(self._q_N, self._q1, self._q2)
 
@@ -116,6 +139,9 @@ class sqrtiSWAP(EntGate):
 
 
 class Chain(EntGate):
+    """Can make a Chain of a given entangling gate by generating all indices
+    and making an entangler between all these indices."""
+
     def __init__(self, entangler, q_N):
         self._entangler = entangler
         self._q_N = q_N
@@ -137,6 +163,8 @@ class Chain(EntGate):
 
 
 class AllToAll(EntGate):
+    """Define AllToAll in similar way to Chain block for a generic entangler."""
+
     def __init__(self, entangler, q_N):
         self._entangler = entangler
         self._q_N = q_N
@@ -160,21 +188,30 @@ class AllToAll(EntGate):
 
 
 class PQC():
+    """A class to define an n qubit wide, n layer deep Parameterised Quantum
+    Circuit."""
+
     def __init__(self, n_qubits, n_layers):
         self._n_qubits = n_qubits
         self._n_layers = n_layers
         self.initial_layer = []#iden(n_qubits)
 
     def set_initialiser(self, init_gate):
+        """Repeat a gate n_qubit times to make a uniform initial layer."""
         N = self._n_qubits
         self.initial_layer = [init_gate(i, N) for i in range(N)]
 
     def set_gates(self, layer):
+        """Repeat a layer of gates n_layer times to create the quantum circuit."""
         self.layer = layer
-        layers = layer * self._n_layers
+        layers = []
+        for i in range(self._n_layers):
+            layers = layers + deepcopy(layer) #need deepcopy so setting theta of one gate doesn't set it for the others
         self.gates = layers
 
     def set_params(self, random=True, angles=[]):
+        """Set the parameters of every parameterised gate (i.e inherits from PRot)
+        in the circuit. Can set either randomly or from a specified list"""
         paramterised = [g for g in self.gates if isinstance(g, PRot)]
         for count, p in enumerate(paramterised):
             if random is True:
@@ -184,6 +221,7 @@ class PQC():
             p.set_theta(angle)
 
     def initialise(self):
+        """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
         for i in self.initial_layer: #initial stuff still not working! Think it may be to do with when default initial layer is used it turns thing nto np array
             circuit_state = i * circuit_state
@@ -193,6 +231,7 @@ class PQC():
         return circuit_state
 
     def gen_quantum_state(self, energy_out=False):
+        """Get a Qobj of |psi> for measurements."""
         self._quantum_state = qt.Qobj(self.initialise())
         if energy_out is True:
             e = self.energy()
