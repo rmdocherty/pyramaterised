@@ -95,6 +95,17 @@ class Measurements():
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
         return prob, F
 
+    def _expr(self, F_samples, N):
+        P_pqc, F = self._gen_histo(F_samples)
+
+        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
+        P_haar = haar / sum(haar) #do i need to normalise this?
+
+        P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
+        log = np.log(P_bar_Q) #take natural log of array
+        expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
+        return expr
+
     def expressibility(self, sample_N, graphs=False):
         """
         Expressibility.
@@ -119,29 +130,31 @@ class Measurements():
         N = 2 ** self._QC._n_qubits
 
         F_samples = self._gen_f_samples(sample_N)
-        P_pqc, F = self._gen_histo(F_samples)
+        expr = self._expr(F_samples, N)
 
-        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
-        P_haar = haar / sum(haar) #do i need to normalise this?
-
-        P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
-        log = np.log(P_bar_Q) #take natural log of array
-        expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
-
-        if graphs is True:
-            plt.figure("Expressibility")
-            plt.plot(F, P_haar, label="Haar", color="C0", alpha=0.7, marker="x")
-            plt.plot(F, P_pqc, label="Quantum state", color="C1", alpha=0.7, marker=".")
-            pretty_subplot(plt.gca(), "Fidelity", "Probability", "Fidelity vs probability", 20)
-        print(f"Expressibility is {expr}")
+        # if graphs is True:
+        #     plt.figure("Expressibility")
+        #     plt.plot(F, P_haar, label="Haar", color="C0", alpha=0.7, marker="x")
+        #     plt.plot(F, P_pqc, label="Quantum state", color="C1", alpha=0.7, marker=".")
+        #     pretty_subplot(plt.gca(), "Fidelity", "Probability", "Fidelity vs probability", 20)
+        #print(f"Expressibility is {expr}")
         return expr
-    
+
     def _gen_entanglement_samples(self, sample_N):
         samples = []
         for i in range(sample_N):
             self._QC.gen_quantum_state(energy_out=False)
             samples.append(self._QC._quantum_state)
         return samples
+
+    def _single_Q(self, system, n):
+        summand = 0
+        for k in range(n):
+            density_matrix = system.ptrace(k)
+            density_matrix *= density_matrix
+            summand += density_matrix.tr()
+        Q = 2 * (1 - (1 / n) * summand)
+        return Q
 
     def entanglement(self, sample_N, graphs=False):
         """
@@ -162,19 +175,14 @@ class Measurements():
         """
         n = self._QC._n_qubits
         samples = self._gen_entanglement_samples(sample_N)
-        ent = []
-        for system in samples:
-            summand = 0
-            for k in range(n):
-                density_matrix = system.ptrace(k)
-                density_matrix *= density_matrix
-                summand += density_matrix.tr()
-            Q = 2 * (1 - (1 / n) * summand)
-            ent.append(Q)
+        ent = [self._single_Q(s, n) for s in samples]
+
         if graphs is True:
+            plt.figure("Entanglement")
             plt.hist(ent, bins="fd")
+            pretty_subplot(plt.gca(), "Entanglement (Q)", "Count", "Entanglement (Q) histogram", 20)
         return ent
-    
+
     def _gen_pauli_group(self):
         N = self._QC._n_qubits
         pauli_list = [qt.qeye(2), qt.sigmax(), qt.sigmay(), qt.sigmaz()]
@@ -214,7 +222,23 @@ class Measurements():
         norm = np.linalg.norm(xi_p, ord=2)
         magic = -1 * np.log(d*norm)
         return magic
-      
+
+    def reuse_states(self, sample_N):
+        overlaps = []
+        q_vals = []
+        n = self._QC._n_qubits
+        for i in range(sample_N):
+            state1 = self._QC.gen_quantum_state()
+            Q1 = self._single_Q(state1, n)
+            state2 = self._QC.gen_quantum_state()
+            Q2 = self._single_Q(state2, n)
+            sqrt_F = state1.overlap(state2)
+            F = sqrt_F * sqrt_F
+            overlaps.append(np.real(F))
+            q_vals.append(Q1)
+            q_vals.append(Q2)
+        return overlaps, q_vals
+    
     def MeyerWallach(self, sample_N): 
         N = self._QC._n_qubits
         
@@ -246,4 +270,3 @@ class Measurements():
         mwexpr = np.mean(entanglements)
         print("The entangling capabilty of the circuit, by the Meyer-Wallach Measure, is " + str(mwexpr))
         return mwexpr 
-        
