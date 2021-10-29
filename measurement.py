@@ -214,5 +214,36 @@ class Measurements():
         norm = np.linalg.norm(xi_p, ord=2)
         magic = -1 * np.log(d*norm)
         return magic
+      
+    def MeyerWallach(self, sample_N): 
+        N = self._QC._n_qubits
         
+        def iota(j, b): 
+            iotabras = []
+            iotakets = []
+            stringstates = [list(i) for i in product([0, 1], repeat = N)]
+            for state in stringstates: 
+                if state[j] == b: 
+                    iotabras.append(state)
+                    newstate = state[:j] + state[j+1:]
+                    iotakets.append(newstate)
+            projector = sum(qt.qip.qubits.qubit_states(N=N-1, states = iotakets[i])*qt.qip.qubits.qubit_states(N=N, states = iotabras[i]).dag() for i in range(len(iotakets)))
+            return projector
+        
+        def Distance(state1, state2): 
+            distance = 0.5*sum(sum((state1[i][0]*state2[j][0] - state1[j][0]*state2[i][0])*np.conj(state1[i][0]*state2[j][0] - state1[j][0]*state2[i][0]) for i in range(2**(N-1))) for j in range(2**(N-1)))
+            return distance    
+        
+        def Q(state): 
+            Q = (4/N)*sum(Distance(iota(i,0)*state,iota(i,1)*state) for i in range(N))
+            return Q
+
+        
+        entanglements = []
+        samples = self._gen_entanglement_samples(sample_N)
+        for system in samples: 
+            entanglements.append(Q(system))
+        mwexpr = np.mean(entanglements)
+        print("The entangling capabilty of the circuit, by the Meyer-Wallach Measure, is " + str(mwexpr))
+        return mwexpr 
         
