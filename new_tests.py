@@ -51,7 +51,7 @@ layer = [pqc.PRot(0, 1)]
 idle_circuit.set_gates(layer)
 idle_circuit_m = Measurements(idle_circuit)
 e = idle_circuit_m.expressibility(5000, graphs=True)
-print(e)
+print(f"Idle circuit expr is {e}, should be around 4.317")
 
 #%%
 circuit_A = pqc.PQC(1, 1)
@@ -95,21 +95,23 @@ mean, std = np.mean(c9_ent), np.std(c9_ent)
 print(f"Circuit 9 entanglement is {mean} +/- {std}")
 
 #%%
-circuit_1 = pqc.PQC(4, 1)
+LAYERS = 3
+circuit_1 = pqc.PQC(4, LAYERS)
 layer = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4),
          pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4)]
 circuit_1.set_gates(layer)
 
 circuit_1_m = Measurements(circuit_1)
 #%%
-circuit_1_m.expressibility(5000, graphs=True)
+c1_expr = circuit_1_m.expressibility(5000, graphs=True)
+print(f"Circuit 1 expressibility at L={LAYERS} is {c1_expr}")
 #%%
 c1_ent = circuit_1_m.entanglement(5000, graphs=True)
 mean, std = np.mean(c1_ent), np.std(c1_ent)
 print(f"Circuit 1 entanglement is {mean} +/- {std}")
 
 #%%
-circuit_2 = pqc.PQC(4, 3)
+circuit_2 = pqc.PQC(4, 1)
 layer = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4),
          pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
          pqc.CNOT([3, 2], 4), pqc.CNOT([2, 1], 4), pqc.CNOT([1, 0], 4)]
@@ -123,9 +125,12 @@ c2_ent = circuit_2_m.entanglement(5000, graphs=True)
 mean, std = np.mean(c2_ent), np.std(c2_ent)
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
 
+c2_mw = circuit_2_m.MeyerWallach(1000)
+print(f"Circuit 2 MW is {c2_mw} ")
+
 #%%
 
-circuit_11 = pqc.PQC(4, 3)
+circuit_11 = pqc.PQC(4, 1)
 layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
          pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
                  pqc.CNOT([1, 0], 4), pqc.CNOT([3, 2], 4),
@@ -140,3 +145,7 @@ circuit_11_m.expressibility(5000, graphs=True)
 c11_ent = circuit_11_m.entanglement(5000, graphs=True)
 mean, std = np.mean(c11_ent), np.std(c11_ent)
 print(f"Circuit 11 entanglement is {mean} +/- {std}")
+#%%
+circuit_11.initialise()
+deriv = circuit_11.take_derivative(1)
+print(deriv * qt.tensor([qt.basis(2, 0) for i in range(circuit_11._n_qubits)]))

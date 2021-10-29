@@ -10,7 +10,7 @@ import qutip as qt
 import numpy as np
 from itertools import chain
 from copy import deepcopy
-from helper_functions import genFockOp, flatten, prod, general_prod
+from helper_functions import genFockOp, flatten, prod
 
 rng = np.random.default_rng(1)
 
@@ -30,6 +30,12 @@ class Gate():
         else:
             return self._operation * b
 
+    def __rmul__(self, b):
+        if isinstance(b, Gate):
+            return b._operation * self._operation
+        else:
+            return b * self._operation
+
 
 class PRot(Gate):
     """A class to described how parametrised rotation gates work - they have a
@@ -41,6 +47,7 @@ class PRot(Gate):
         self._q_N = q_N
         self._theta = 0
         self._operation = self._set_op()
+        
 
     def _set_op(self):
         """Change this for different PRots to change their behaviour"""
@@ -56,7 +63,7 @@ class PRot(Gate):
         """Take the derivative of the PRot - this generates the pauli gate
         associated with the gate type (i.e R_x -> sigma_x) operating on given
         qubit and multiplies it by j/2."""
-        focks = genFockOp(self._pauli(), self._q_on, self._q_N, 2)
+        focks = genFockOp(self._pauli, self._q_on, self._q_N, 2)
         deriv = -1j * focks / 2
         return deriv
 
@@ -208,12 +215,20 @@ class PQC():
         for i in range(self._n_layers):
             layers = layers + deepcopy(layer) #need deepcopy so setting theta of one gate doesn't set it for the others
         self.gates = layers
+        self._parameterised = []
+        param_count = 0
+        for gate in layers:
+            if isinstance(gate, PRot):
+                self._parameterised.append(param_count)
+                param_count += 1
+            else:
+                self._parameterised.append(-1)
 
     def set_params(self, random=True, angles=[]):
         """Set the parameters of every parameterised gate (i.e inherits from PRot)
         in the circuit. Can set either randomly or from a specified list"""
-        paramterised = [g for g in self.gates if isinstance(g, PRot)]
-        for count, p in enumerate(paramterised):
+        parameterised = [g for g in self.gates if isinstance(g, PRot)]
+        for count, p in enumerate(parameterised):
             if random is True:
                 angle = rng.random(1)[0] * 2 * np.pi
             else:
@@ -244,6 +259,17 @@ class PQC():
         H = Z0 * Z1
         energy = qt.expect(H, self._quantum_state)
         return energy
+
+    def take_derivative(self, g_on, method="Felix"):
+        p_loc = self._parameterised.index(g_on)
+        gate = self.gates[p_loc]
+        deriv = gate.derivative()
+        derivative_circuit = deepcopy(self.gates) #deepcopy is a slow operation!
+        if method == "Felix":
+            derivative_circuit[p_loc] = deriv * gate
+        else:
+            derivative_circuit[0] = deriv * derivative_circuit[0]
+        return derivative_circuit
 
     def __repr__(self):
         line1 = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"

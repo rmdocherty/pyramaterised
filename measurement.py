@@ -268,5 +268,6 @@ class Measurements():
         for system in samples: 
             entanglements.append(Q(system))
         mwexpr = np.mean(entanglements)
-        print("The entangling capabilty of the circuit, by the Meyer-Wallach Measure, is " + str(mwexpr))
-        return mwexpr 
+        mwstd = np.std(entanglements)
+        print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
+        return mwexpr, mwstd 
