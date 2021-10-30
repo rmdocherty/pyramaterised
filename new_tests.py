@@ -59,24 +59,8 @@ layer = [pqc.H(0, 1), pqc.R_x(0, 1)]
 circuit_A.set_initialiser(pqc.PRot)
 circuit_A.set_gates(layer)
 circuit_A_expr = Measurements(circuit_A)
-a_e = circuit_A_expr.expressibility(5000, graphs=True)
-print(a_e)
-#%%
-original_circuit = pqc.PQC(4,3)
-original_circuit.set_initialiser(pqc.H)
-rotate_layer = []
-options = [pqc.R_x, pqc.R_y, pqc.R_z]
-for i in range(4):
-    R = random.choice(options)
-    rotate_layer.append(R(i, 4))
-print(rotate_layer)
-layer = rotate_layer + [pqc.Chain(pqc.CNOT, 4)]
-original_circuit.set_gates(layer)
-original_circuit.gen_quantum_state()
-print(original_circuit)
-e = original_circuit.energy()
-print(e)
-
+a_e = circuit_A_expr.expressibility(100, graphs=True)
+print(circuit_A)
 #%%
 circuit_9 = pqc.PQC(4, 1)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
@@ -149,3 +133,21 @@ print(f"Circuit 11 entanglement is {mean} +/- {std}")
 circuit_11.initialise()
 deriv = circuit_11.take_derivative(1)
 print(deriv * qt.tensor([qt.basis(2, 0) for i in range(circuit_11._n_qubits)]))
+#%%
+qg_circuit = pqc.PQC(4, 1)
+layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
+layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
+layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
+layer = layer1 + layer2 + layer3
+qg_circuit.set_initialiser(pqc.sqrtH) #needs to be a sqrtH initialiser!!
+qg_circuit.set_gates(layer)
+
+qg_circuit._quantum_state = qt.Qobj(qg_circuit.initialise(random=False, angles=[3.21587011, 5.97193953, 0.90578156, 5.96054027,
+       1.9592948 , 2.65983852, 5.20060878, 2.571074,
+       3.45319898, 0.17315902, 4.73446249, 3.38125416]))
+print(qg_circuit)
+energy = qg_circuit.energy()
+print(f"Energy is {energy}") #should ouput 0.46135870050914374
+qg_m = Measurements(qg_circuit)
+efd = qg_m.get_effective_quantum_dimension(10**-12)
+print(efd) #should output 12

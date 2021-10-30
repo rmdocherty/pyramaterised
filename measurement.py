@@ -27,8 +27,9 @@ class Measurements():
             qfi_matrix : np.array
             A n_param * n_param matrix of the QFI matrix for the VQC.
         """
-        n_params = self._QC._n_params #these should both probably be getter methods but still
-        grad_state_list = self._QC._gradient_state_list
+        n_params = len([i for i in self._QC._parameterised if i > -1]) #these should both probably be getter methods but still
+        print(f"Number of params is {n_params}")
+        grad_state_list = self._QC.get_gradients()
 
         #get all single elements first
         single_qfi_elements = np.zeros(n_params, dtype=np.complex128)
@@ -57,7 +58,9 @@ class Measurements():
             eff_quant_dim = Int
         """
         QFI = self._get_QFI()
+        #print(QFI)
         eigvals, eigvecs = scipy.linalg.eigh(QFI)
+        print(eigvals)
         nonzero_eigvals = eigvals[eigvals > cutoff_eigvals]
         eff_quant_dim = len(nonzero_eigvals)
         return eff_quant_dim

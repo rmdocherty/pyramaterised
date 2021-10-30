@@ -96,15 +96,34 @@ class R_z(PRot):
 
 
 class H(PRot):
-    def set_theta(self, angle):
+    def __init__(self, q_on, q_N):
+        self._q_on = q_on
+        self._q_N = q_N
         self._theta = np.pi / 2
         self._operation = self._set_op()
+
+    def set_theta(self, angle):
+        return None
 
     def _set_op(self):
         """Hadamard gate is just sigma_x * R_y(pi/2)"""
         ops = qt.qip.operations
         self._gate = ops.ry
-        return ops.x_gate(self._q_N, self._q_on) * self._gate(self._theta, N=self._q_N, target=self._q_on)
+        return ops.x_gate(self._q_N, self._q_on) * self._gate(np.pi / 2, N=self._q_N, target=self._q_on)
+
+
+class sqrtH(H):
+    def __init__(self, q_on, q_N):
+        self._q_on = q_on
+        self._q_N = q_N
+        self._theta = np.pi / 4
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        """sqrt Hadamard gate is just R_y(pi/4)"""
+        ops = qt.qip.operations
+        self._gate = ops.ry
+        return self._gate(np.pi / 4, N=self._q_N, target=self._q_on)
 
 
 class EntGate(Gate):
@@ -145,7 +164,7 @@ class sqrtiSWAP(EntGate):
         return gate(self._q_N, self._q1, self._q2)
 
 
-class Chain(EntGate):
+class CHAIN(EntGate):
     """Can make a Chain of a given entangling gate by generating all indices
     and making an entangler between all these indices."""
 
@@ -159,17 +178,17 @@ class Chain(EntGate):
         top_connections = [[2 * j, 2 * j + 1] for j in range(N // 2)]
         bottom_connections = [[2 * j + 1, 2 * j + 2] for j in range((N - 1) // 2)]
         indices = top_connections + bottom_connections
-        entangling_layer = [self._entangler(index_pair, N) for index_pair in indices][::-1]
-        out = iden(N)
-        for i in entangling_layer:
-            out = i * out
-        return out
+        entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
+        #out = iden(N)
+        #for i in entangling_layer:
+        #    out = i * out
+        return entangling_layer
 
     def __repr__(self):
         return f"CHAIN connected {self._entangler.__name__}s"
 
 
-class AllToAll(EntGate):
+class ALLTOALL(EntGate):
     """Define AllToAll in similar way to Chain block for a generic entangler."""
 
     def __init__(self, entangler, q_N):
@@ -184,11 +203,11 @@ class AllToAll(EntGate):
             for j in range(i + 1, N):
                 nested_temp_indices.append(rng.perumtation([i, j]))
         indices = flatten(nested_temp_indices)
-        entangling_layer = [self._entangler(index_pair, N) for index_pair in indices][::-1]
-        out = iden(N)
-        for i in entangling_layer:
-            out = i * out
-        return out
+        entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
+        #out = iden(N)
+        #for i in entangling_layer:
+        #    out = i * out
+        return entangling_layer
 
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
@@ -235,12 +254,12 @@ class PQC():
                 angle = angles[count]
             p.set_theta(angle)
 
-    def initialise(self):
+    def initialise(self, random=True, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
         for i in self.initial_layer: #initial stuff still not working! Think it may be to do with when default initial layer is used it turns thing nto np array
             circuit_state = i * circuit_state
-        self.set_params()
+        self.set_params(random=random, angles=angles)
         for g in self.gates:
             circuit_state = g * circuit_state
         return circuit_state
@@ -271,8 +290,22 @@ class PQC():
             derivative_circuit[0] = deriv * derivative_circuit[0]
         return derivative_circuit
 
+    def get_gradients(self):
+        gradient_state_list = []
+        n_params = len([i for i in self._parameterised if i > -1])
+        for i in range(n_params):
+            gradient = self.take_derivative(i)
+            circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+            for ig in self.initial_layer:
+                circuit_state = ig * circuit_state
+            #circuit_state = gradient * circuit_state
+            for g in gradient:
+                circuit_state = g * circuit_state
+            gradient_state_list.append(qt.Qobj(circuit_state))
+        return gradient_state_list
+
     def __repr__(self):
         line1 = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"
         line2 = f"Initial layer:\n{self.initial_layer}\n"
-        line3 = f"Repeated layer: \n{self.layer}"
+        line3 = f"Repeated layer: \n{self.gates}"
         return line1 + line2 + line3
