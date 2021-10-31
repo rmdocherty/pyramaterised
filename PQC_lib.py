@@ -5,7 +5,7 @@ Created on Fri Oct 15 11:22:14 2021
 
 @author: ronan
 """
-
+#%% Imports
 import qutip as qt
 import numpy as np
 from itertools import chain
@@ -13,6 +13,8 @@ from copy import deepcopy
 from helper_functions import genFockOp, flatten, prod
 
 rng = np.random.default_rng(1)
+
+#%% Gates
 
 
 def iden(N):
@@ -212,6 +214,8 @@ class ALLTOALL(EntGate):
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
 
+#%% Circuit code
+
 
 class PQC():
     """A class to define an n qubit wide, n layer deep Parameterised Quantum
@@ -273,6 +277,7 @@ class PQC():
         return self._quantum_state
 
     def energy(self):
+        """Get energy of |psi>, the initial quantum state"""
         Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
         Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
         H = Z0 * Z1
@@ -280,9 +285,14 @@ class PQC():
         return energy
 
     def take_derivative(self, g_on, method="Felix"):
+        """Get the derivative of the ith parameter of the circuit and return
+        the circuit where the ith gate is multiplied by its derivative."""
+        #need to find which gate the ith parameterised gate is
         p_loc = self._parameterised.index(g_on)
         gate = self.gates[p_loc]
+        #find the derivative using the gate's derivative method
         deriv = gate.derivative()
+        #need to deepcopy so we don't modify the original circuit
         derivative_circuit = deepcopy(self.gates) #deepcopy is a slow operation!
         if method == "Felix":
             derivative_circuit[p_loc] = deriv * gate
@@ -291,6 +301,8 @@ class PQC():
         return derivative_circuit
 
     def get_gradients(self):
+        """Get the n_params circuits with the ith derivative multiplied in and
+        then apply them to the basis state."""
         gradient_state_list = []
         n_params = len([i for i in self._parameterised if i > -1])
         for i in range(n_params):
@@ -306,5 +318,5 @@ class PQC():
     def __repr__(self):
         line1 = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"
         line2 = f"Initial layer:\n{self.initial_layer}\n"
-        line3 = f"Repeated layer: \n{self.gates}"
+        line3 = f"Gates: \n{self.gates}"
         return line1 + line2 + line3

@@ -44,8 +44,8 @@ print("Action of 2 Hadamards on |0> is |0> again")
 #%% ENTANGLING
 
 
-
 #%% ===========EXPR AND ENT TESTS===========
+"""Tests based on Expr baselines from Fig 1 arXiv:1905.10876v1"""
 idle_circuit = pqc.PQC(1, 1)
 layer = [pqc.PRot(0, 1)]
 idle_circuit.set_gates(layer)
@@ -60,11 +60,11 @@ circuit_A.set_initialiser(pqc.PRot)
 circuit_A.set_gates(layer)
 circuit_A_expr = Measurements(circuit_A)
 a_e = circuit_A_expr.expressibility(100, graphs=True)
-print(circuit_A)
+print(f"Circuit_A expr is {a_e}, should be around 0.2")
 #%%
 circuit_9 = pqc.PQC(4, 4)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
-         pqc.CHAIN(pqc.CPHASE, 4), #pqc.CPHASE([3,2], 4), pqc.CPHASE([2,1], 4), pqc.CPHASE([1,0], 4)
+         pqc.CHAIN(pqc.CPHASE, 4),
          pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
 #circuit_A.set_initialiser(pqc.PRot)
 circuit_9.set_gates(layer)
@@ -109,12 +109,12 @@ c2_ent = circuit_2_m.entanglement(5000, graphs=True)
 mean, std = np.mean(c2_ent), np.std(c2_ent)
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
 
-c2_mw = circuit_2_m.MeyerWallach(1000)
+c2_mw = circuit_2_m.meyer_wallach(1000)
 print(f"Circuit 2 MW is {c2_mw} ")
 
 #%%
 
-circuit_11 = pqc.PQC(4, 1)
+circuit_11 = pqc.PQC(4, 3)
 layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
          pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
                  pqc.CNOT([1, 0], 4), pqc.CNOT([3, 2], 4),
@@ -124,16 +124,11 @@ layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
 circuit_11.set_gates(layer)
 circuit_11_m = Measurements(circuit_11)
 #%%
-circuit_11_m.expressibility(5000, graphs=True)
+out = circuit_11_m.efficient_measurements(448)
+print(out['Expr'])
+
 #%%
-c11_ent = circuit_11_m.entanglement(5000, graphs=True)
-mean, std = np.mean(c11_ent), np.std(c11_ent)
-print(f"Circuit 11 entanglement is {mean} +/- {std}")
-#%%
-circuit_11.initialise()
-deriv = circuit_11.take_derivative(1)
-print(deriv * qt.tensor([qt.basis(2, 0) for i in range(circuit_11._n_qubits)]))
-#%%
+"""Tests based on arXiv:2102.01659v1 github"""
 qg_circuit = pqc.PQC(4, 1)
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
@@ -147,9 +142,9 @@ qg_circuit._quantum_state = qt.Qobj(qg_circuit.initialise(random=False, angles=[
        3.45319898, 0.17315902, 4.73446249, 3.38125416]))
 print(qg_circuit)
 energy = qg_circuit.energy()
-print(f"Energy is {energy}") #should ouput 0.46135870050914374
+print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
 efd = qg_m.get_effective_quantum_dimension(10**-12)
-print(f"Effective quantum dimension is {efd}") #should output 12
+print(f"Effective quantum dimension is {efd}, should be 12")
 new_measure = qg_m.new_measure()
 print(f"New measure is {new_measure}")

@@ -9,7 +9,7 @@ import qutip as qt
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-from itertools import product
+from itertools import product, combinations
 from helper_functions import pretty_subplot
 
 
@@ -149,6 +149,7 @@ class Measurements():
         return expr
 
     def _gen_entanglement_samples(self, sample_N):
+        """Generate sample_N quantum states to be used for entanglement calculations"""
         samples = []
         for i in range(sample_N):
             self._QC.gen_quantum_state(energy_out=False)
@@ -156,6 +157,7 @@ class Measurements():
         return samples
 
     def _single_Q(self, system, n):
+        """Calcuate Q value for single |psi> using average qubit purity."""
         summand = 0
         for k in range(n):
             density_matrix = system.ptrace(k)
@@ -245,8 +247,25 @@ class Measurements():
             q_vals.append(Q1)
             q_vals.append(Q2)
         return overlaps, q_vals
-    
-    def MeyerWallach(self, sample_N): 
+
+    def efficient_measurements(self, sample_N):
+        n = self._QC._n_qubits
+        states = [self._QC.gen_quantum_state() for i in range(sample_N)]
+        #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
+        state_pairs = list(combinations(states, r=2))
+        overlaps = []
+        q_vals = []
+        for psi, phi in state_pairs:
+            F = np.abs(psi.overlap(phi))**2
+            overlaps.append(F)
+        expr = self._expr(overlaps, 2**n)
+        for psi in states:
+            Q = self._single_Q(psi, n)
+            q_vals.append(Q)
+        q, std = np.mean(q_vals), np.std(q_vals)
+        return {"Expr": expr, "Ent": [q, std]}
+
+    def meyer_wallach(self, sample_N): 
         N = self._QC._n_qubits
         
         def iota(j, b): 
