@@ -11,6 +11,7 @@ some numpy functions.
 import qutip as qt
 from functools import partial, reduce
 import operator
+import matplotlib.pyplot as plt
 
 
 def prod(factors):
@@ -43,3 +44,12 @@ def pretty_subplot(axis, x_label, y_label, title, fontsize):  #formatting graphs
     axis.tick_params(labelsize=fontsize)
     axis.set_facecolor("#fffcf5")
     #axis.legend(fontsize=fontsize-2)
+
+def pretty_graph(x_label, y_label, title, fontsize):  #formatting graphs
+    figure = plt.gcf()
+    figure.set_size_inches(18, 10)
+    plt.xlabel(x_label, fontsize=fontsize)
+    plt.title(title, fontsize=fontsize)
+    plt.ylabel(y_label, fontsize=fontsize)
+    plt.tick_params(labelsize=fontsize)
+    plt.gca().set_facecolor("#fffcf5")
