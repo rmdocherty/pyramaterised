@@ -298,7 +298,6 @@ class PQC():
             circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
             for ig in self.initial_layer:
                 circuit_state = ig * circuit_state
-            #circuit_state = gradient * circuit_state
             for g in gradient:
                 circuit_state = g * circuit_state
             gradient_state_list.append(qt.Qobj(circuit_state))

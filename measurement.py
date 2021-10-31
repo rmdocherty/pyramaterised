@@ -44,7 +44,7 @@ class Measurements():
                 #single_qfi_elements[i] is <d_i psi | psi>
                 RHS = np.conjugate(single_qfi_elements[p]) * single_qfi_elements[q]
                 #assign p, qth elem of QFI, c.f eq (B3) in NIST review
-                qfi_matrix[p, q] = np.real(deriv_overlap - RHS)
+                qfi_matrix[p, q] = 4 * np.real(deriv_overlap - RHS) #factor of 4 as otherwise is fubini-study metric
 
         for p in range(n_params): #use fact QFI mat. real, hermitian and therefore symmetric
             for q in range(p + 1, n_params):
@@ -65,6 +65,12 @@ class Measurements():
         eff_quant_dim = len(nonzero_eigvals)
         return eff_quant_dim
 
+    def new_measure(self):
+        QFI = self._get_QFI()
+        eigvals, eigvecs = scipy.linalg.eigh(QFI)
+        capped = [1 if v > 1 else v for v in eigvals]
+        return sum(capped)
+
     def _gen_f_samples(self, sample_N):
         """
         Generate random psi_theta and psi_pi $sample_N times for given PQC, then calculate
@@ -77,10 +83,9 @@ class Measurements():
             self._QC.gen_quantum_state(energy_out=False)
             state1 = self._QC._quantum_state #psi theta
             self._QC.gen_quantum_state(energy_out=False)
-            state2 = self._QC._quantum_state #psi phi
-            sqrt_F = state1.overlap(state2)
-            F = sqrt_F * sqrt_F
-            F_samples.append(np.real(F))
+            state2 = self._QC._quantum_state #psi phi 
+            F = np.abs(state1.overlap(state2))**2
+            F_samples.append(F)
         return F_samples
 
     def _gen_histo(self, F_samples):
@@ -235,9 +240,8 @@ class Measurements():
             Q1 = self._single_Q(state1, n)
             state2 = self._QC.gen_quantum_state()
             Q2 = self._single_Q(state2, n)
-            sqrt_F = state1.overlap(state2)
-            F = sqrt_F * sqrt_F
-            overlaps.append(np.real(F))
+            F = np.abs(state1.overlap(state2))**2
+            overlaps.append(F)
             q_vals.append(Q1)
             q_vals.append(Q2)
         return overlaps, q_vals

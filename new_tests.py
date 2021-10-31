@@ -62,9 +62,9 @@ circuit_A_expr = Measurements(circuit_A)
 a_e = circuit_A_expr.expressibility(100, graphs=True)
 print(circuit_A)
 #%%
-circuit_9 = pqc.PQC(4, 1)
+circuit_9 = pqc.PQC(4, 4)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
-         pqc.CPHASE([3,2], 4), pqc.CPHASE([2,1], 4), pqc.CPHASE([1,0], 4),
+         pqc.CHAIN(pqc.CPHASE, 4), #pqc.CPHASE([3,2], 4), pqc.CPHASE([2,1], 4), pqc.CPHASE([1,0], 4)
          pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
 #circuit_A.set_initialiser(pqc.PRot)
 circuit_9.set_gates(layer)
@@ -150,4 +150,6 @@ energy = qg_circuit.energy()
 print(f"Energy is {energy}") #should ouput 0.46135870050914374
 qg_m = Measurements(qg_circuit)
 efd = qg_m.get_effective_quantum_dimension(10**-12)
-print(efd) #should output 12
+print(f"Effective quantum dimension is {efd}") #should output 12
+new_measure = qg_m.new_measure()
+print(f"New measure is {new_measure}")
