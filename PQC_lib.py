@@ -9,7 +9,7 @@ Created on Fri Oct 15 11:22:14 2021
 import qutip as qt
 import numpy as np
 from itertools import chain
-from copy import deepcopy
+from copy import copy, deepcopy
 from helper_functions import genFockOp, flatten, prod
 
 rng = np.random.default_rng(1)
@@ -48,6 +48,7 @@ class PRot(Gate):
         self._q_on = q_on
         self._q_N = q_N
         self._theta = 0
+        self._is_param = True
         self._operation = self._set_op()
         
 
@@ -102,6 +103,7 @@ class H(PRot):
         self._q_on = q_on
         self._q_N = q_N
         self._theta = np.pi / 2
+        self._is_param = False
         self._operation = self._set_op()
 
     def set_theta(self, angle):
@@ -119,6 +121,7 @@ class sqrtH(H):
         self._q_on = q_on
         self._q_N = q_N
         self._theta = np.pi / 4
+        self._is_param = False
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -137,6 +140,7 @@ class EntGate(Gate):
     def __init__(self, qs_on, q_N):
         self._q1, self._q2 = qs_on[0], qs_on[1]
         self._q_N = q_N
+        self._is_param = False
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -173,6 +177,7 @@ class CHAIN(EntGate):
     def __init__(self, entangler, q_N):
         self._entangler = entangler
         self._q_N = q_N
+        self._is_param = False
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -193,6 +198,7 @@ class ALLTOALL(EntGate):
     def __init__(self, entangler, q_N):
         self._entangler = entangler
         self._q_N = q_N
+        self._is_param = False
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -215,27 +221,31 @@ class PQC():
     """A class to define an n qubit wide, n layer deep Parameterised Quantum
     Circuit."""
 
-    def __init__(self, n_qubits, n_layers):
+    def __init__(self, n_qubits):
         self._n_qubits = n_qubits
-        self._n_layers = n_layers
-        self.initial_layer = []#iden(n_qubits)
+        self._n_layers = 0
+        self._layers = []
 
-    def set_initialiser(self, init_gate):
-        """Repeat a gate n_qubit times to make a uniform initial layer."""
-        N = self._n_qubits
-        self.initial_layer = [init_gate(i, N) for i in range(N)]
+    def add_layer(self, layer, n=1):
+        for i in range(n):
+            self._layers.append(deepcopy(layer))
+        self._n_layers += n
+        self.set_gates()
 
-    def set_gates(self, layer):
+    def set_layer(self, layer, pos):
+        self._layers[pos] = deepcopy(layer)
+        self.set_gates()
+
+    def set_gates(self):
         """Repeat a layer of gates n_layer times to create the quantum circuit."""
-        self.layer = layer
         layers = []
-        for i in range(self._n_layers):
-            layers = layers + deepcopy(layer) #need deepcopy so setting theta of one gate doesn't set it for the others
+        for i in self._layers:
+            layers = layers + i
         self.gates = layers
         self._parameterised = []
         param_count = 0
-        for gate in layers:
-            if isinstance(gate, PRot):
+        for gate in self.gates:
+            if gate._is_param:
                 self._parameterised.append(param_count)
                 param_count += 1
             else:
@@ -244,7 +254,7 @@ class PQC():
     def set_params(self, random=True, angles=[]):
         """Set the parameters of every parameterised gate (i.e inherits from PRot)
         in the circuit. Can set either randomly or from a specified list"""
-        parameterised = [g for g in self.gates if isinstance(g, PRot)]
+        parameterised = [g for g in self.gates if g._is_param]
         for count, p in enumerate(parameterised):
             if random is True:
                 angle = rng.random(1)[0] * 2 * np.pi
@@ -255,8 +265,6 @@ class PQC():
     def initialise(self, random=True, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
-        for i in self.initial_layer: #initial stuff still not working! Think it may be to do with when default initial layer is used it turns thing nto np array
-            circuit_state = i * circuit_state
         self.set_params(random=random, angles=angles)
         for g in self.gates:
             circuit_state = g * circuit_state
@@ -278,21 +286,24 @@ class PQC():
         energy = qt.expect(H, self._quantum_state)
         return energy
 
-    def take_derivative(self, g_on, method="Felix"):
+    def take_derivative(self, g_on):
         """Get the derivative of the ith parameter of the circuit and return
         the circuit where the ith gate is multiplied by its derivative."""
         #need to find which gate the ith parameterised gate is
         p_loc = self._parameterised.index(g_on)
-        gate = self.gates[p_loc]
+        gates = self.gates
+        gate = copy(gates[p_loc])
         #find the derivative using the gate's derivative method
         deriv = gate.derivative()
-        #need to deepcopy so we don't modify the original circuit
-        derivative_circuit = deepcopy(self.gates) #deepcopy is a slow operation!
-        if method == "Felix":
-            derivative_circuit[p_loc] = deriv * gate
-        else:
-            derivative_circuit[0] = deriv * derivative_circuit[0]
-        return derivative_circuit
+        #set pth gate to be deriv * gate
+        gates[p_loc] = deriv * gate
+        #act the derivative of circuit on |0>
+        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        for g in gates:
+            circuit_state = g * circuit_state
+        #reset the gate back to what it was originally
+        gates[p_loc] = gate
+        return circuit_state
 
     def get_gradients(self):
         """Get the n_params circuits with the ith derivative multiplied in and
@@ -301,16 +312,11 @@ class PQC():
         n_params = len([i for i in self._parameterised if i > -1])
         for i in range(n_params):
             gradient = self.take_derivative(i)
-            circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
-            for ig in self.initial_layer:
-                circuit_state = ig * circuit_state
-            for g in gradient:
-                circuit_state = g * circuit_state
-            gradient_state_list.append(qt.Qobj(circuit_state))
+            gradient_state_list.append(gradient)
         return gradient_state_list
 
     def __repr__(self):
-        line1 = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"
-        line2 = f"Initial layer:\n{self.initial_layer}\n"
-        line3 = f"Gates: \n{self.gates}"
-        return line1 + line2 + line3
+        line = f"A {self._n_qubits} qubit, {self._n_layers} layer deep PQC. \n"
+        for count, l in enumerate(self._layers):
+            line += f"Layer {count}: {l} \n"
+        return line

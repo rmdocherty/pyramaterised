@@ -132,17 +132,28 @@ print(out['Expr'])
 
 #%%
 """Tests based on arXiv:2102.01659v1 github"""
-qg_circuit = pqc.PQC(4, 1)
+qg_circuit = pqc.PQC(4)
+init_layer = [pqc.sqrtH(i, 4) for i in range(4)]
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
-layer = layer1 + layer2 + layer3
-qg_circuit.set_initialiser(pqc.sqrtH) #needs to be a sqrtH initialiser!!
-qg_circuit.set_gates(layer)
+#layer = layer1 + layer2 + layer3
+#qg_circuit.set_initialiser(pqc.sqrtH) #needs to be a sqrtH initialiser!!
+#qg_circuit.set_gates(layer)
 
-qg_circuit._quantum_state = qt.Qobj(qg_circuit.initialise(random=False, angles=[3.21587011, 5.97193953, 0.90578156, 5.96054027,
-       1.9592948 , 2.65983852, 5.20060878, 2.571074,
-       3.45319898, 0.17315902, 4.73446249, 3.38125416]))
+qg_circuit.add_layer(init_layer)
+qg_circuit.add_layer(layer1)
+qg_circuit.add_layer(layer2)
+qg_circuit.add_layer(layer3)
+qg_circuit.add_layer(layer1, 100)
+
+qg_circuit.gen_quantum_state()
+#
+# qg_circuit._quantum_state = qt.Qobj(qg_circuit.initialise(random=False, 
+#         angles=[
+#         3.21587011, 5.97193953, 0.90578156, 5.96054027,
+#        1.9592948 , 2.65983852, 5.20060878, 2.571074,
+#        3.45319898, 0.17315902, 4.73446249, 3.38125416]))
 print(qg_circuit)
 energy = qg_circuit.energy()
 print(f"Energy is {energy}, should be 0.46135870050914374")
@@ -151,6 +162,17 @@ efd = qg_m.get_effective_quantum_dimension(10**-12)
 print(f"Effective quantum dimension is {efd}, should be 12")
 new_measure = qg_m.new_measure()
 print(f"New measure is {new_measure}")
+out = qg_m.efficient_measurements(500)
+entropy = out['Magic']
+print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%%
-N = 4
-layer = [pqc.R_x(i, N) for i in range(N)]
+class Bell:
+    def __init__(self):
+        self._n_qubits = 2
+        self._quantum_state = qt.states.bell_state('11')
+    def gen_quantum_state(self):
+        return qt.states.bell_state('11')
+
+bell_m = Measurements(Bell())
+e = bell_m.entropy_of_magic()
+print(e)

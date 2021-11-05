@@ -220,17 +220,19 @@ class Measurements():
         trace = (Q * tensor).tr()
         magic = -1 * np.log(d * trace)
         return magic
-    
-    def entropy_of_magic(self):
-        P_n = self._gen_pauli_group()
-        psi = self._QC._quantum_state
+
+    def entropy_of_magic(self, psi=None, P_n=[]): #do we need to do this over many states?
+        if P_n == []:
+            P_n = self._gen_pauli_group()
+        if psi == None:
+            psi = self._QC._quantum_state
         N = self._QC._n_qubits
         d = 2**N
         xi_p = []
         for P in P_n:
             xi_p.append((d**-1) * qt.expect(P, psi)**2)
         norm = np.linalg.norm(xi_p, ord=2)
-        magic = -1 * np.log(d*norm)
+        magic = -1 * np.log10(d*norm**2) #should we use log10, ln or log
         return magic
 
     def reuse_states(self, sample_N):
@@ -259,11 +261,19 @@ class Measurements():
             F = np.abs(psi.overlap(phi))**2
             overlaps.append(F)
         expr = self._expr(overlaps, 2**n)
+
         for psi in states:
             Q = self._single_Q(psi, n)
             q_vals.append(Q)
         q, std = np.mean(q_vals), np.std(q_vals)
-        return {"Expr": expr, "Ent": [q, std]}
+
+        P_n = self._gen_pauli_group()
+        magics = []
+        for psi in states:
+            entropy_of_magic = self.entropy_of_magic(psi, P_n)
+            magics.append(entropy_of_magic)
+        magic_bar, magic_std = np.mean(magics), np.std(magics)
+        return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std]}
 
     def meyer_wallach(self, sample_N): 
         N = self._QC._n_qubits
