@@ -95,13 +95,16 @@ mean, std = np.mean(c1_ent), np.std(c1_ent)
 print(f"Circuit 1 entanglement is {mean} +/- {std}")
 
 #%%
-circuit_2 = pqc.PQC(4, 1)
-layer = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4),
-         pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
-         pqc.CNOT([3, 2], 4), pqc.CNOT([2, 1], 4), pqc.CNOT([1, 0], 4)]
+N = 10
+circuit_2 = pqc.PQC(N, 100)
+layer = [pqc.R_x(0, N), pqc.R_x(1, N), pqc.R_x(2, N), pqc.R_x(3, N),
+         pqc.R_z(0, N), pqc.R_z(1, N), pqc.R_z(2, N), pqc.R_z(3, N),
+         pqc.CNOT([3, 2], N), pqc.CNOT([2, 1], N), pqc.CNOT([1, 0], N)]
 circuit_2.set_gates(layer)
 
 circuit_2_m = Measurements(circuit_2)
+#%%
+circuit_2_m.get_effective_quantum_dimension(10)
 #%%
 circuit_2_m.expressibility(5000, graphs=True)
 #%%
@@ -148,3 +151,6 @@ efd = qg_m.get_effective_quantum_dimension(10**-12)
 print(f"Effective quantum dimension is {efd}, should be 12")
 new_measure = qg_m.new_measure()
 print(f"New measure is {new_measure}")
+#%%
+N = 4
+layer = [pqc.R_x(i, N) for i in range(N)]

@@ -16,9 +16,9 @@ import random
 import PQC_lib as pqc
 
 random.seed(1) #for reproducibility
-SAMPLE_N = 142 #this produces 10011 unique state pairs with itertools.combination
+SAMPLE_N = 124 #this produces 10011 unique state pairs with itertools.combination
 LOAD = False
-SAVE = True
+SAVE = False
 VERBOSE = True
 
 #%% CIRCUITS
@@ -79,7 +79,8 @@ for circuit in range(len(circuit_layers)):
         plt.plot(circuit_names[circuit], circuit_data[circuit, L, 0],
                  label=f"L={L+1}", marker=layer_icons[L], ms=13, color=colors[L])
 plt.yscale("log")
-plt.ylim(0.0015, 0.9)
+#plt.ylim(0.0015, 0.9)
+#plt.legend(fontsize=18)
 pretty_graph("Circuit ID", "Expr, D_KL", "Expressibility vs Circuit", 20)
 plt.grid()
 
@@ -89,5 +90,6 @@ for circuit in range(len(circuit_layers)):
         plt.plot(circuit_names[circuit], circuit_data[circuit, L, 1],
                  label=f"L={L+1}", marker=layer_icons[L], ms=13, color=colors[L])
 pretty_graph("Circuit ID", "Entaglement, Q", "Entanglement vs Circuit", 20)
+#plt.legend(fontsize=18)
 plt.grid()
 

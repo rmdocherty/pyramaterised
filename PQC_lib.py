@@ -181,9 +181,6 @@ class CHAIN(EntGate):
         bottom_connections = [[2 * j + 1, 2 * j + 2] for j in range((N - 1) // 2)]
         indices = top_connections + bottom_connections
         entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
-        #out = iden(N)
-        #for i in entangling_layer:
-        #    out = i * out
         return entangling_layer
 
     def __repr__(self):
@@ -206,9 +203,6 @@ class ALLTOALL(EntGate):
                 nested_temp_indices.append(rng.perumtation([i, j]))
         indices = flatten(nested_temp_indices)
         entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
-        #out = iden(N)
-        #for i in entangling_layer:
-        #    out = i * out
         return entangling_layer
 
     def __repr__(self):
