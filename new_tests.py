@@ -185,42 +185,81 @@ e = bell_m.entropy_of_magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 
 #%%
-P = 10
 
-def shift_list(p, N):
+
+def gen_shift_list(p, N):
     A = [i for i in range(N // 2)]
     s = 1
-    shift_list = []
+    shift_list = np.zeros(2**(N//2), dtype=np.int32) #we have at most 2^(N/2) layers
     count = 1
-    while count < p and A != []:
-        r = A.pop(0) #get first elem out
-        shift_list.append(r) #a_s
+    while A != []:
+        r = A.pop(0) #get first elem out of A
+        shift_list[s - 1] = r #a_s
         qs = [i for i in range(1, s)] #count up from 1 to s-1
         for q in qs:
-            shift_list.append(r) #a_s+q = a_q
+            shift_list[s + q - 1] = shift_list[q - 1] #a_s+q = a_q
+        s = 2 * s
+    return shift_list
         
 
 def NPQC_layers(p, N):
-    initial_layer = [pqc.R_y(i, p) for i in range(p)] + [pqc.R_z(i, p) for i in range(p)]
-    angles = [0 for i in range(2*p)]
-    layers = []
+    initial_layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)]
+    angles = [np.pi/2 for i in range(N)] + [0 for i in range(N)]
+    layers = [initial_layer]
+    shift_list = gen_shift_list(p, N)
     for i in range(0, p-1):
         p_layer = []
         a_l = shift_list[i]
-        #U_ent layer
+        fixed_rots, cphases = [], []
+        #U_ent layer - not paramterised and shouldn't be counted as such!
         for k in range(1, 1 + N // 2):
-            q_on = 2 * k - 2 #need to shift the index by 1 as lists 0-indexed
-            U_ent = pqc.CPHASE(q_on, (q_on + 1) + 2 * a_l % N)
-            rotation = pqc.R_y(q_on, N)
-            p_layer.append(U_ent)
-            p_layer.append(rotation)
-            angles.append(np.pi / 2)
-        #rotation layer
-        for k in range(1, N // 2):
+            q_on = 2 * k - 2
+            rotation = pqc.fixed_R_y(q_on, N)
+            fixed_rots.append(rotation)
+            U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
+            cphases.append(U_ent)
+        p_layer = fixed_rots + cphases #need fixed r_y to come before c_phase
+
+        #rotation layer - r_y then r_z on each kth qubit
+        for k in range(1, N // 2 + 1):
             q_on = 2 * k - 2
             p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
-            angles.append(0)
+            angles.append(np.pi/2)
             angles.append(0)
         layers.append(p_layer)
-    return layer, angles
-        
+    return layers, angles
+
+def check_iden(A):
+    M = len(A)
+    diag_entries = []
+    non_zero_off_diags = []
+    for i, row in enumerate(A):
+        for j, column in enumerate(row):
+            if i == j:
+                diag_entries.append(column)
+            elif column != 0 and i != j:
+                non_zero_off_diags.append(column)
+    print(f"Diagonals are: {diag_entries}")
+    if len(non_zero_off_diags) == 0:
+        print("No nonzero off diagonals!")
+    elif len(non_zero_off_diags) > 0:
+        print("There are nonzero off diagonals!")
+        print(non_zero_off_diags)
+
+
+N = 8
+P = 6 #works iff P < N - is this expected behaviour?
+print(N, P)
+layers, theta_ref = NPQC_layers(P, N)
+NPQC = pqc.PQC(N)
+for l in layers:
+    NPQC.add_layer(l)
+NPQC._quantum_state = qt.Qobj(NPQC.run(angles=theta_ref))
+print(NPQC, theta_ref)
+
+NPQC_m = Measurements(NPQC)
+QFI = np.array(NPQC_m._get_QFI())
+masked = np.where(QFI < 10**-12, 0, QFI)
+print(f"QFI of NPQC with N={N}, layers={P} is: \n {masked}")
+check_iden(masked)
+#print(QFI)

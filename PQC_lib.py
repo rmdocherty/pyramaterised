@@ -131,6 +131,15 @@ class sqrtH(H):
         return self._gate(np.pi / 4, N=self._q_N, target=self._q_on)
 
 
+class fixed_R_y(sqrtH):
+    def _set_op(self):
+        """sqrt Hadamard gate is just R_y(pi/4)"""
+        self._theta = np.pi / 2
+        ops = qt.qip.operations
+        self._gate = ops.ry
+        return self._gate(np.pi / 2, N=self._q_N, target=self._q_on)
+
+
 class EntGate(Gate):
     """A class to described how entangling gates work - they have the
     qubits they operate on (control and target) and a total number of qubits
