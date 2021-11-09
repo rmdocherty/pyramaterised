@@ -50,7 +50,6 @@ class PRot(Gate):
         self._theta = 0
         self._is_param = True
         self._operation = self._set_op()
-        
 
     def _set_op(self):
         """Change this for different PRots to change their behaviour"""
@@ -99,6 +98,8 @@ class R_z(PRot):
 
 
 class H(PRot):
+    """Hadamard gate."""
+
     def __init__(self, q_on, q_N):
         self._q_on = q_on
         self._q_N = q_N
@@ -117,23 +118,21 @@ class H(PRot):
 
 
 class sqrtH(H):
-    def __init__(self, q_on, q_N):
-        self._q_on = q_on
-        self._q_N = q_N
-        self._theta = np.pi / 4
-        self._is_param = False
-        self._operation = self._set_op()
+    """Sqrt hadarmard, used in the quantum geometry circuit."""
 
     def _set_op(self):
         """sqrt Hadamard gate is just R_y(pi/4)"""
+        self._theta = np.pi / 4
         ops = qt.qip.operations
         self._gate = ops.ry
         return self._gate(np.pi / 4, N=self._q_N, target=self._q_on)
 
 
 class fixed_R_y(sqrtH):
+    """Fixed R_y rotation by pi/2. Needs to inherit from sqrtH so that it
+    isn't counted as a parameterised gate later in NPQC code."""
+
     def _set_op(self):
-        """sqrt Hadamard gate is just R_y(pi/4)"""
         self._theta = np.pi / 2
         ops = qt.qip.operations
         self._gate = ops.ry
@@ -236,17 +235,22 @@ class PQC():
         self._layers = []
 
     def add_layer(self, layer, n=1):
+        """Add $n layers to PQC._layers"""
         for i in range(n):
             self._layers.append(deepcopy(layer))
         self._n_layers += n
-        self.set_gates()
+        self.set_gates() #update PQC.gates when adding
 
     def set_layer(self, layer, pos):
+        """Set nth layer of PQC to given layer. Will throw error if pos not available"""
         self._layers[pos] = deepcopy(layer)
         self.set_gates()
 
     def set_gates(self):
-        """Repeat a layer of gates n_layer times to create the quantum circuit."""
+        """For each layer in layer, append it to gates. If layers is a nested list
+        of layers, then gates is a flat list of each gate operation in order. Then
+        iterate through gates and update a list that says if a gate is parameterised
+        or not (-1), and which parameterised gate it is, i.e is it the 1st, 2nd, ..."""
         layers = []
         for i in self._layers:
             layers = layers + i
@@ -305,6 +309,7 @@ class PQC():
         #need to find which gate the ith parameterised gate is
         p_loc = self._parameterised.index(g_on)
         gates = self.gates
+        #copy so don't overwrite later - much better than deepcopying whole circuit!
         gate = copy(gates[p_loc])
         #find the derivative using the gate's derivative method
         deriv = gate.derivative()

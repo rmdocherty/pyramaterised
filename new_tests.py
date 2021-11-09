@@ -61,6 +61,7 @@ circuit_A_expr = Measurements(circuit_A)
 a_e = circuit_A_expr.expressibility(100, graphs=True)
 print(f"Circuit_A expr is {a_e}, should be around 0.2")
 #%%
+"""Tests based on Expr and Ent values from Figs 3 and 4 of arXiv:1905.10876v1 """
 N = 4
 circuit_9 = pqc.PQC(4)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
@@ -108,6 +109,7 @@ circuit_2_m.get_effective_quantum_dimension(10)
 #%%
 circuit_2_m.expressibility(5000, graphs=True)
 #%%
+"""Check if Q value measurements is same as Meyer Wallach method"""
 c2_ent = circuit_2_m.entanglement(100, graphs=True)
 mean, std = np.mean(c2_ent), np.std(c2_ent)
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
@@ -131,21 +133,18 @@ out = circuit_11_m.efficient_measurements(104)
 print(out['Expr'])
 
 #%%
-"""Tests based on arXiv:2102.01659v1 github"""
+"""Tests based on default circuit in arXiv:2102.01659v1 github"""
 qg_circuit = pqc.PQC(4)
 init_layer = [pqc.sqrtH(i, 4) for i in range(4)]
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
-#layer = layer1 + layer2 + layer3
-#qg_circuit.set_initialiser(pqc.sqrtH) #needs to be a sqrtH initialiser!!
-#qg_circuit.set_gates(layer)
+
 
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
 qg_circuit.add_layer(layer3)
-#qg_circuit.add_layer(layer1, 100)
 
 qg_circuit.gen_quantum_state()
 
@@ -166,32 +165,40 @@ print(f"New measure is {new_measure}")
 out = qg_m.efficient_measurements(500)
 entropy = out['Magic']
 print(f"Magic is {entropy[0]} +/- {entropy[1]}")
+
 #%%
-[print(g._theta) for g in qg_circuit.gates if g._is_param]
-#print(qg_circuit.get_params())
-#%%
-minimun = qg_m.train(epsilon=0.0001, rate=0.0001)
-print(f"Minimum ground state energy is {minimun}")
-#%%
+
+
 class Bell:
     def __init__(self):
         self._n_qubits = 2
         self._quantum_state = qt.states.bell_state('11')
+
     def gen_quantum_state(self):
         return qt.states.bell_state('11')
+
 
 bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 
 #%%
+"""
+Testing using an NPQC as defined in https://arxiv.org/pdf/2107.14063.pdf
+Defining property of NPQC is that QFI(theta_r) = Identity, where
+theta_r_i =  0 for R_x gates, pi/2 for R_y gates. This speeds up training when
+theta_r used as initial parameter vector. To check our QFI code is working,
+generate each NPQC with N qubits and P <= 2**(N/2) layers and check it's QFI
+is the identity when initialised with theta_r - this means every off diagonal
+element of the QFI should be 0, which is checked for in check_iden().
+"""
 
 
 def gen_shift_list(p, N):
+    #lots of -1 as paper indexing is 1-based and list-indexing 0 based
     A = [i for i in range(N // 2)]
     s = 1
-    shift_list = np.zeros(2**(N//2), dtype=np.int32) #we have at most 2^(N/2) layers
-    count = 1
+    shift_list = np.zeros(2**(N // 2), dtype=np.int32) #we have at most 2^(N/2) layers
     while A != []:
         r = A.pop(0) #get first elem out of A
         shift_list[s - 1] = r #a_s
@@ -200,37 +207,40 @@ def gen_shift_list(p, N):
             shift_list[s + q - 1] = shift_list[q - 1] #a_s+q = a_q
         s = 2 * s
     return shift_list
-        
+
 
 def NPQC_layers(p, N):
+    #started with fixed block of N R_y and N R_x as first layer
     initial_layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)]
-    angles = [np.pi/2 for i in range(N)] + [0 for i in range(N)]
+    angles = [np.pi / 2 for i in range(N)] + [0 for i in range(N)]
     layers = [initial_layer]
     shift_list = gen_shift_list(p, N)
-    for i in range(0, p-1):
+    for i in range(0, p - 1):
         p_layer = []
         a_l = shift_list[i]
         fixed_rots, cphases = [], []
         #U_ent layer - not paramterised and shouldn't be counted as such!
         for k in range(1, 1 + N // 2):
             q_on = 2 * k - 2
-            rotation = pqc.fixed_R_y(q_on, N)
+            rotation = pqc.fixed_R_y(q_on, N) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
             fixed_rots.append(rotation)
             U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
             cphases.append(U_ent)
         p_layer = fixed_rots + cphases #need fixed r_y to come before c_phase
 
-        #rotation layer - r_y then r_z on each kth qubit
+        #rotation layer - R_y then R_z on each kth qubit
         for k in range(1, N // 2 + 1):
             q_on = 2 * k - 2
             p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
-            angles.append(np.pi/2)
+            #R_y gates have theta_i = pi/2 for theta_r
+            angles.append(np.pi / 2)
+            #R_z gates have theta_i = 0 for theta_r
             angles.append(0)
         layers.append(p_layer)
     return layers, angles
 
+
 def check_iden(A):
-    M = len(A)
     diag_entries = []
     non_zero_off_diags = []
     for i, row in enumerate(A):
@@ -239,7 +249,6 @@ def check_iden(A):
                 diag_entries.append(column)
             elif column != 0 and i != j:
                 non_zero_off_diags.append(column)
-    print(f"Diagonals are: {diag_entries}")
     if len(non_zero_off_diags) == 0:
         print("No nonzero off diagonals!")
     elif len(non_zero_off_diags) > 0:
@@ -247,19 +256,17 @@ def check_iden(A):
         print(non_zero_off_diags)
 
 
-N = 8
-P = 6 #works iff P < N - is this expected behaviour?
-print(N, P)
-layers, theta_ref = NPQC_layers(P, N)
-NPQC = pqc.PQC(N)
-for l in layers:
-    NPQC.add_layer(l)
-NPQC._quantum_state = qt.Qobj(NPQC.run(angles=theta_ref))
-print(NPQC, theta_ref)
+for N in range(4, 10, 2):
+    for P in range(1, 2**(N // 2) + 1): #works iff P < 2^(N/2) so agrees with paper.
+        print(f"NPQC with {N} qubits and {P} layers")
+        layers, theta_ref = NPQC_layers(P, N)
+        NPQC = pqc.PQC(N)
+        for l in layers:
+            NPQC.add_layer(l)
+        NPQC._quantum_state = qt.Qobj(NPQC.run(angles=theta_ref))
 
-NPQC_m = Measurements(NPQC)
-QFI = np.array(NPQC_m._get_QFI())
-masked = np.where(QFI < 10**-12, 0, QFI)
-print(f"QFI of NPQC with N={N}, layers={P} is: \n {masked}")
-check_iden(masked)
-#print(QFI)
+        NPQC_m = Measurements(NPQC)
+        QFI = np.array(NPQC_m._get_QFI())
+        masked = np.where(QFI < 10**-12, 0, QFI)
+        check_iden(masked)
+        print("\n")
