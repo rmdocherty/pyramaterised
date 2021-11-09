@@ -183,6 +183,50 @@ bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 
+
+def gen_clifford_circuit(p, N):
+    clifford_gates = [pqc.H, pqc.S, pqc.CNOT]
+    layers = []
+    for i in range(p):
+        layer = []
+        for n in range(N):
+            gate = random.choice(clifford_gates)
+            if type(gate) == pqc.PRot:
+                q_on = random.randint(0, N - 1)
+                layer.append(gate(q_on, N))
+            elif type(gate) == pqc.EntGate:
+                qs = range(N)
+                q_1 = random.sample(qs) #use sample so can't pick same option twice
+                q_2 = random.sample(qs)
+                layer.append(gate([q_1, q_2], N))
+            layers.append(layer)
+    return layers
+
+
+"""
+Generate max_N * max_P circuits comprised entriely of random clifford gates
+from the group {H, S, CNOT} with n qubits, p layers and n operations per layer.
+Then calculate the entropy of magic of these circuits - should be 0 or close
+to it for all p, n values.
+"""
+
+max_N = 6
+max_P = 12
+
+entropies = []
+for n in range(1, max_N):
+    for p in range(1, max_P):
+        layers = gen_clifford_circuit(p, n)
+        clifford_circuit = pqc.PQC(n)
+        for l in layers:
+            clifford_circuit.add_layer(l)
+        clifford_circuit._quantum_state = qt.Qobj(clifford_circuit.run())
+        c_c_m = Measurements(clifford_circuit)
+        e = c_c_m.entropy_of_magic()
+        entropies.append(e)
+
+print(f"Entropies of magic are {entropies}") #values are ~0 for all so further proff code is working.
+
 #%%
 """
 Testing using an NPQC as defined in https://arxiv.org/pdf/2107.14063.pdf
@@ -257,15 +301,15 @@ def check_iden(A):
         print(non_zero_off_diags)
 
 
-for N in range(4, 10, 2):
+for N in range(4, 10, 2): #step=2 for even N
     for P in range(1, 2**(N // 2) + 1): #works iff P < 2^(N/2) so agrees with paper.
         print(f"NPQC with {N} qubits and {P} layers")
         layers, theta_ref = NPQC_layers(P, N)
         NPQC = pqc.PQC(N)
         for l in layers:
             NPQC.add_layer(l)
+        #need to set |psi> before making QFI measurements
         NPQC._quantum_state = qt.Qobj(NPQC.run(angles=theta_ref))
-
         NPQC_m = Measurements(NPQC)
         QFI = np.array(NPQC_m._get_QFI())
         masked = np.where(QFI < 10**-12, 0, QFI)
