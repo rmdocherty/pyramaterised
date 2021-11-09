@@ -21,9 +21,9 @@ random.seed(1) #for reproducibility
 
 #%% HADAMARDS
 """Single Hadamard gate acting on |0> basis state should just be (sqrt(2), sqrt(2))"""
-test_H = pqc.PQC(1, 1)
+test_H = pqc.PQC(1)
 layer = [pqc.H(0, 1)]
-test_H.set_gates(layer)
+test_H.add_layer(layer)
 out = test_H.gen_quantum_state()
 
 x_component = np.real(out[1][0][0])
@@ -34,9 +34,9 @@ print(f"Output of 1 Hadamard circuit on |0> basis is ({x_component}, {y_componen
 
 
 """Apply 2 Hadamard gates using the layer structure to test if it works."""
-test_2H = pqc.PQC(1, 2)
+test_2H = pqc.PQC(1)
 layer = [pqc.H(0, 1)]
-test_2H.set_gates(layer)
+test_2H.add_layer(layer, n=2)
 out = test_2H.gen_quantum_state()
 assert out == qt.basis(2, 0) #assert throws exception if conditional not true
 print("Action of 2 Hadamards on |0> is |0> again")
@@ -46,28 +46,28 @@ print("Action of 2 Hadamards on |0> is |0> again")
 
 #%% ===========EXPR AND ENT TESTS===========
 """Tests based on Expr baselines from Fig 1 arXiv:1905.10876v1"""
-idle_circuit = pqc.PQC(1, 1)
+idle_circuit = pqc.PQC(1)
 layer = [pqc.PRot(0, 1)]
-idle_circuit.set_gates(layer)
+idle_circuit.add_layer(layer)
 idle_circuit_m = Measurements(idle_circuit)
 e = idle_circuit_m.expressibility(5000, graphs=True)
 print(f"Idle circuit expr is {e}, should be around 4.317")
 
 #%%
-circuit_A = pqc.PQC(1, 1)
+circuit_A = pqc.PQC(1)
 layer = [pqc.H(0, 1), pqc.R_x(0, 1)]
-circuit_A.set_initialiser(pqc.PRot)
-circuit_A.set_gates(layer)
+circuit_A.add_layer(layer)
 circuit_A_expr = Measurements(circuit_A)
 a_e = circuit_A_expr.expressibility(100, graphs=True)
 print(f"Circuit_A expr is {a_e}, should be around 0.2")
 #%%
-circuit_9 = pqc.PQC(4, 4)
+N = 4
+circuit_9 = pqc.PQC(4)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
          pqc.CHAIN(pqc.CPHASE, 4),
          pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
 #circuit_A.set_initialiser(pqc.PRot)
-circuit_9.set_gates(layer)
+circuit_9.add_layer(layer, N)
 #circuit_9.gen_quantum_state()
 circuit_9_m = Measurements(circuit_9)
 #%% 1min05
@@ -80,10 +80,10 @@ print(f"Circuit 9 entanglement is {mean} +/- {std}")
 
 #%%
 LAYERS = 3
-circuit_1 = pqc.PQC(4, LAYERS)
+circuit_1 = pqc.PQC(4)
 layer = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4),
          pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4)]
-circuit_1.set_gates(layer)
+circuit_1.add_layer(layer, LAYERS)
 
 circuit_1_m = Measurements(circuit_1)
 #%%
@@ -95,12 +95,12 @@ mean, std = np.mean(c1_ent), np.std(c1_ent)
 print(f"Circuit 1 entanglement is {mean} +/- {std}")
 
 #%%
-N = 10
-circuit_2 = pqc.PQC(N, 100)
+N = 4
+circuit_2 = pqc.PQC(N)
 layer = [pqc.R_x(0, N), pqc.R_x(1, N), pqc.R_x(2, N), pqc.R_x(3, N),
          pqc.R_z(0, N), pqc.R_z(1, N), pqc.R_z(2, N), pqc.R_z(3, N),
          pqc.CNOT([3, 2], N), pqc.CNOT([2, 1], N), pqc.CNOT([1, 0], N)]
-circuit_2.set_gates(layer)
+circuit_2.add_layer(layer, n=3)
 
 circuit_2_m = Measurements(circuit_2)
 #%%
@@ -108,26 +108,26 @@ circuit_2_m.get_effective_quantum_dimension(10)
 #%%
 circuit_2_m.expressibility(5000, graphs=True)
 #%%
-c2_ent = circuit_2_m.entanglement(5000, graphs=True)
+c2_ent = circuit_2_m.entanglement(100, graphs=True)
 mean, std = np.mean(c2_ent), np.std(c2_ent)
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
 
-c2_mw = circuit_2_m.meyer_wallach(1000)
+c2_mw = circuit_2_m.meyer_wallach(100)
 print(f"Circuit 2 MW is {c2_mw} ")
 
 #%%
 
-circuit_11 = pqc.PQC(4, 3)
+circuit_11 = pqc.PQC(4)
 layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
          pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
                  pqc.CNOT([1, 0], 4), pqc.CNOT([3, 2], 4),
                      pqc.R_y(1, 4), pqc.R_y(2, 4),
                      pqc.R_z(1, 4), pqc.R_z(2, 4),
                          pqc.CNOT([2, 1], 4)]
-circuit_11.set_gates(layer)
+circuit_11.add_layer(layer, 3)
 circuit_11_m = Measurements(circuit_11)
 #%%
-out = circuit_11_m.efficient_measurements(448)
+out = circuit_11_m.efficient_measurements(104)
 print(out['Expr'])
 
 #%%
@@ -145,17 +145,18 @@ qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
 qg_circuit.add_layer(layer3)
-qg_circuit.add_layer(layer1, 100)
+#qg_circuit.add_layer(layer1, 100)
 
 qg_circuit.gen_quantum_state()
-#
-# qg_circuit._quantum_state = qt.Qobj(qg_circuit.initialise(random=False, 
-#         angles=[
-#         3.21587011, 5.97193953, 0.90578156, 5.96054027,
-#        1.9592948 , 2.65983852, 5.20060878, 2.571074,
-#        3.45319898, 0.17315902, 4.73446249, 3.38125416]))
+
+qg_circuit._quantum_state = qt.Qobj(qg_circuit.run(
+        angles=[
+        3.21587011, 5.97193953, 0.90578156, 5.96054027,
+        1.9592948 , 2.65983852, 5.20060878, 2.571074,
+        3.45319898, 0.17315902, 4.73446249, 3.38125416]))
 print(qg_circuit)
 energy = qg_circuit.energy()
+#%%
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
 efd = qg_m.get_effective_quantum_dimension(10**-12)
@@ -166,6 +167,12 @@ out = qg_m.efficient_measurements(500)
 entropy = out['Magic']
 print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%%
+[print(g._theta) for g in qg_circuit.gates if g._is_param]
+#print(qg_circuit.get_params())
+#%%
+minimun = qg_m.train(epsilon=0.0001, rate=0.0001)
+print(f"Minimum ground state energy is {minimun}")
+#%%
 class Bell:
     def __init__(self):
         self._n_qubits = 2
@@ -175,4 +182,45 @@ class Bell:
 
 bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
-print(e)
+print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
+
+#%%
+P = 10
+
+def shift_list(p, N):
+    A = [i for i in range(N // 2)]
+    s = 1
+    shift_list = []
+    count = 1
+    while count < p and A != []:
+        r = A.pop(0) #get first elem out
+        shift_list.append(r) #a_s
+        qs = [i for i in range(1, s)] #count up from 1 to s-1
+        for q in qs:
+            shift_list.append(r) #a_s+q = a_q
+        
+
+def NPQC_layers(p, N):
+    initial_layer = [pqc.R_y(i, p) for i in range(p)] + [pqc.R_z(i, p) for i in range(p)]
+    angles = [0 for i in range(2*p)]
+    layers = []
+    for i in range(0, p-1):
+        p_layer = []
+        a_l = shift_list[i]
+        #U_ent layer
+        for k in range(1, 1 + N // 2):
+            q_on = 2 * k - 2 #need to shift the index by 1 as lists 0-indexed
+            U_ent = pqc.CPHASE(q_on, (q_on + 1) + 2 * a_l % N)
+            rotation = pqc.R_y(q_on, N)
+            p_layer.append(U_ent)
+            p_layer.append(rotation)
+            angles.append(np.pi / 2)
+        #rotation layer
+        for k in range(1, N // 2):
+            q_on = 2 * k - 2
+            p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
+            angles.append(0)
+            angles.append(0)
+        layers.append(p_layer)
+    return layer, angles
+        

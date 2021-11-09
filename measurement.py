@@ -108,10 +108,11 @@ class Measurements():
 
         haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
         P_haar = haar / sum(haar) #do i need to normalise this?
-
-        P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
-        log = np.log(P_bar_Q) #take natural log of array
-        expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
+        
+        expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
+        #P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
+        #log = np.log(P_bar_Q) #take natural log of array
+        #expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
         return expr
 
     def expressibility(self, sample_N, graphs=False):
@@ -200,27 +201,6 @@ class Measurements():
         P_n = [qt.tensor(list(s)) for s in strings]
         return P_n
 
-    def _compute_projector(self):
-        N = self._QC._n_qubits
-        P_n = self._gen_pauli_group()
-        empty = qt.Qobj(np.array([[0, 0], [0, 0]]))
-        proj = qt.tensor([qt.tensor([empty for i in range(N)]) for i in range(4)])
-        for P in P_n:
-            proj += qt.tensor([P for i in range(4)])
-        proj = proj * (2**N)**-2
-        return proj
-
-    def old_entropy_of_magic(self):
-        psi = self._QC._quantum_state
-        N = self._QC._n_qubits
-        d = (2**N)**-2
-        Q = self._compute_projector()
-        density_matrix = psi * psi.dag()
-        tensor = qt.tensor([density_matrix for i in range(4)])
-        trace = (Q * tensor).tr()
-        magic = -1 * np.log(d * trace)
-        return magic
-
     def entropy_of_magic(self, psi=None, P_n=[]): #do we need to do this over many states?
         if P_n == []:
             P_n = self._gen_pauli_group()
@@ -232,23 +212,10 @@ class Measurements():
         for P in P_n:
             xi_p.append((d**-1) * qt.expect(P, psi)**2)
         norm = np.linalg.norm(xi_p, ord=2)
-        magic = -1 * np.log10(d*norm**2) #should we use log10, ln or log
+        magic = -1 * np.log(d*norm**2) #should we use log10, ln or log
+        if magic > np.log(d + 1) - np.log(2):
+            raise Exception("Magic max exceeded!")
         return magic
-
-    def reuse_states(self, sample_N):
-        overlaps = []
-        q_vals = []
-        n = self._QC._n_qubits
-        for i in range(sample_N):
-            state1 = self._QC.gen_quantum_state()
-            Q1 = self._single_Q(state1, n)
-            state2 = self._QC.gen_quantum_state()
-            Q2 = self._single_Q(state2, n)
-            F = np.abs(state1.overlap(state2))**2
-            overlaps.append(F)
-            q_vals.append(Q1)
-            q_vals.append(Q2)
-        return overlaps, q_vals
 
     def efficient_measurements(self, sample_N):
         n = self._QC._n_qubits
@@ -256,22 +223,21 @@ class Measurements():
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
         state_pairs = list(combinations(states, r=2))
         overlaps = []
-        q_vals = []
+
         for psi, phi in state_pairs:
             F = np.abs(psi.overlap(phi))**2
             overlaps.append(F)
         expr = self._expr(overlaps, 2**n)
 
-        for psi in states:
-            Q = self._single_Q(psi, n)
-            q_vals.append(Q)
-        q, std = np.mean(q_vals), np.std(q_vals)
-
         P_n = self._gen_pauli_group()
         magics = []
+        q_vals = []
         for psi in states:
             entropy_of_magic = self.entropy_of_magic(psi, P_n)
             magics.append(entropy_of_magic)
+            Q = self._single_Q(psi, n)
+            q_vals.append(Q)
+        q, std = np.mean(q_vals), np.std(q_vals)
         magic_bar, magic_std = np.mean(magics), np.std(magics)
         return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std]}
 
@@ -307,3 +273,32 @@ class Measurements():
         mwstd = np.std(entanglements)
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
+
+    def train(self, epsilon=0.010, rate=0.001, method="gradient"):
+        quit_iterations = 100000
+        count = 0
+        diff = 1
+        self._QC._quantum_state = self._QC.run()
+        prev_energy = self._QC.energy()
+        while diff > epsilon and count < quit_iterations:
+            gradient_list = self._QC.get_gradients()
+            gradients = []
+            for count, i in enumerate(gradient_list):
+                self._QC._quantum_state = i
+                overlap = self._QC.energy()
+                gradients.append(overlap)
+            theta = self._QC.get_params()
+            #print("gradients is: ", gradients)
+            #print(gradients)
+            #if method == "gradient":
+                
+            theta_update = list(np.array(theta) - rate * np.array(gradients))
+               # print(type(theta_update), theta_update)
+            #print("updated theta is: ", theta_update)
+            self._QC._quantum_state = self._QC.run(angles=theta_update)
+            energy = self._QC.energy()
+            diff = np.abs(energy - prev_energy)
+            count += 1
+            prev_energy = energy
+        print(f"Finished after {count} iterations")
+        return energy

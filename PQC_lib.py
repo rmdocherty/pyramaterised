@@ -251,28 +251,32 @@ class PQC():
             else:
                 self._parameterised.append(-1)
 
-    def set_params(self, random=True, angles=[]):
+    def get_params(self):
+        angles = [g._theta for g in self.gates if g._is_param]
+        return angles
+
+    def set_params(self, angles=[]):
         """Set the parameters of every parameterised gate (i.e inherits from PRot)
         in the circuit. Can set either randomly or from a specified list"""
         parameterised = [g for g in self.gates if g._is_param]
         for count, p in enumerate(parameterised):
-            if random is True:
-                angle = rng.random(1)[0] * 2 * np.pi
-            else:
+            if angles != []:
                 angle = angles[count]
+            else: #use random params
+                angle = rng.random(1)[0] * 2 * np.pi
             p.set_theta(angle)
 
-    def initialise(self, random=True, angles=[]):
+    def run(self, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
-        self.set_params(random=random, angles=angles)
+        self.set_params(angles=angles)
         for g in self.gates:
             circuit_state = g * circuit_state
         return circuit_state
 
     def gen_quantum_state(self, energy_out=False):
         """Get a Qobj of |psi> for measurements."""
-        self._quantum_state = qt.Qobj(self.initialise())
+        self._quantum_state = qt.Qobj(self.run())
         if energy_out is True:
             e = self.energy()
             print(f"Energy of state is {e}")
