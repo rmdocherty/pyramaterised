@@ -217,28 +217,40 @@ class Measurements():
             raise Exception("Magic max exceeded!")
         return magic
 
-    def efficient_measurements(self, sample_N):
+    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True):
         n = self._QC._n_qubits
         states = [self._QC.gen_quantum_state() for i in range(sample_N)]
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
         state_pairs = list(combinations(states, r=2))
         overlaps = []
 
-        for psi, phi in state_pairs:
-            F = np.abs(psi.overlap(phi))**2
-            overlaps.append(F)
-        expr = self._expr(overlaps, 2**n)
+        if expr:
+            for psi, phi in state_pairs:
+                F = np.abs(psi.overlap(phi))**2
+                overlaps.append(F)
+            expr = self._expr(overlaps, 2**n)
+        else:
+            expr = -1
 
         P_n = self._gen_pauli_group()
         magics = []
         q_vals = []
-        for psi in states:
-            entropy_of_magic = self.entropy_of_magic(psi, P_n)
-            magics.append(entropy_of_magic)
-            Q = self._single_Q(psi, n)
-            q_vals.append(Q)
-        q, std = np.mean(q_vals), np.std(q_vals)
-        magic_bar, magic_std = np.mean(magics), np.std(magics)
+
+        if ent:
+            for psi in states:
+                Q = self._single_Q(psi, n)
+                q_vals.append(Q)
+            q, std = np.mean(q_vals), np.std(q_vals)
+        else:
+            q, std = -1, -1
+
+        if eom:
+            for psi in states:
+                entropy_of_magic = self.entropy_of_magic(psi, P_n)
+                magics.append(entropy_of_magic)
+            magic_bar, magic_std = np.mean(magics), np.std(magics)
+        else:
+            magic_bar, magic_std = 0, 0
         return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std]}
 
     def meyer_wallach(self, sample_N): 

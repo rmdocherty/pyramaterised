@@ -50,75 +50,76 @@ idle_circuit = pqc.PQC(1)
 layer = [pqc.PRot(0, 1)]
 idle_circuit.add_layer(layer)
 idle_circuit_m = Measurements(idle_circuit)
-e = idle_circuit_m.expressibility(5000, graphs=True)
-print(f"Idle circuit expr is {e}, should be around 4.317")
+e = idle_circuit_m.efficient_measurements(100, expr=True, ent=False, eom=False) #N=100 -> 4950 state pairs
+print(f"Idle circuit expr is {e['Expr']}, should be around 4.317")
 
 #%%
 circuit_A = pqc.PQC(1)
 layer = [pqc.H(0, 1), pqc.R_x(0, 1)]
 circuit_A.add_layer(layer)
 circuit_A_expr = Measurements(circuit_A)
-a_e = circuit_A_expr.expressibility(100, graphs=True)
-print(f"Circuit_A expr is {a_e}, should be around 0.2")
+a_e = circuit_A_expr.efficient_measurements(100, expr=True, ent=False, eom=False)
+print(f"Circuit_A expr is {a_e['Expr']}, should be around 0.2")
 #%%
 """Tests based on Expr and Ent values from Figs 3 and 4 of arXiv:1905.10876v1 """
-N = 4
+L = 4
 circuit_9 = pqc.PQC(4)
 layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
          pqc.CHAIN(pqc.CPHASE, 4),
          pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
 #circuit_A.set_initialiser(pqc.PRot)
-circuit_9.add_layer(layer, N)
+circuit_9.add_layer(layer, L)
 #circuit_9.gen_quantum_state()
 circuit_9_m = Measurements(circuit_9)
 #%% 1min05
-e = circuit_9_m.expressibility(5000, graphs=True)
-print(e)
-#%%
-c9_ent = circuit_9_m.entanglement(5000, graphs=True)
-mean, std = np.mean(c9_ent), np.std(c9_ent)
+e = circuit_9_m.efficient_measurements(100, expr=True, ent=True, eom=False)
+print(f"Circuit 9 expr for {L} layers is {e['Expr']} ")
+
+mean, std = e['Ent']
 print(f"Circuit 9 entanglement is {mean} +/- {std}")
 
 #%%
-LAYERS = 3
+L = 3
 circuit_1 = pqc.PQC(4)
 layer = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4),
          pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4)]
-circuit_1.add_layer(layer, LAYERS)
+circuit_1.add_layer(layer, L)
 
 circuit_1_m = Measurements(circuit_1)
 #%%
-c1_expr = circuit_1_m.expressibility(5000, graphs=True)
-print(f"Circuit 1 expressibility at L={LAYERS} is {c1_expr}")
-#%%
-c1_ent = circuit_1_m.entanglement(5000, graphs=True)
-mean, std = np.mean(c1_ent), np.std(c1_ent)
+c1_out = circuit_1_m.efficient_measurements(100, expr=True, ent=True, eom=False)
+print(f"Circuit 1 expressibility at L={L} is {c1_out['Expr']}")
+
+mean, std = c1_out['Ent']
 print(f"Circuit 1 entanglement is {mean} +/- {std}")
 
 #%%
 N = 4
+L = 3
 circuit_2 = pqc.PQC(N)
 layer = [pqc.R_x(0, N), pqc.R_x(1, N), pqc.R_x(2, N), pqc.R_x(3, N),
          pqc.R_z(0, N), pqc.R_z(1, N), pqc.R_z(2, N), pqc.R_z(3, N),
          pqc.CNOT([3, 2], N), pqc.CNOT([2, 1], N), pqc.CNOT([1, 0], N)]
-circuit_2.add_layer(layer, n=3)
+circuit_2.add_layer(layer, n=L)
 
+circuit_2._quantum_state = circuit_2.run()
 circuit_2_m = Measurements(circuit_2)
-#%%
-circuit_2_m.get_effective_quantum_dimension(10)
-#%%
-circuit_2_m.expressibility(5000, graphs=True)
-#%%
+
+c2_efd = circuit_2_m.get_effective_quantum_dimension(10**-12)
+print(f"Circuit 2 effective quantum dimensions is {c2_efd}")
+
+c2_out = circuit_2_m.efficient_measurements(100, expr=True, ent=True, eom=False)
+print(f"Circuit 2 expr for {L} layers is {c2_out['Expr']} ")
+
 """Check if Q value measurements is same as Meyer Wallach method"""
-c2_ent = circuit_2_m.entanglement(100, graphs=True)
-mean, std = np.mean(c2_ent), np.std(c2_ent)
+mean, std = c2_out['Ent']
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
 
 c2_mw = circuit_2_m.meyer_wallach(100)
-print(f"Circuit 2 MW is {c2_mw} ")
+#print(f"Circuit 2 MW is {c2_mw} ")
 
 #%%
-
+L = 3
 circuit_11 = pqc.PQC(4)
 layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
          pqc.R_z(0, 4), pqc.R_z(1, 4), pqc.R_z(2, 4), pqc.R_z(3, 4),
@@ -126,11 +127,11 @@ layer = [pqc.R_y(0, 4), pqc.R_y(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4),
                      pqc.R_y(1, 4), pqc.R_y(2, 4),
                      pqc.R_z(1, 4), pqc.R_z(2, 4),
                          pqc.CNOT([2, 1], 4)]
-circuit_11.add_layer(layer, 3)
+circuit_11.add_layer(layer, L)
 circuit_11_m = Measurements(circuit_11)
-#%%
-out = circuit_11_m.efficient_measurements(104)
-print(out['Expr'])
+
+c11_out = circuit_11_m.efficient_measurements(104)
+print(f"Circuit 11 expr for {L} layers is  {c11_out['Expr']}")
 
 #%%
 """Tests based on default circuit in arXiv:2102.01659v1 github"""
