@@ -14,7 +14,7 @@ from helper_functions import genFockOp, flatten, prod
 
 rng = np.random.default_rng(1)
 
-#%% Gates
+#%% =============================GATES=============================
 
 
 def iden(N):
@@ -37,6 +37,8 @@ class Gate():
             return b._operation * self._operation
         else:
             return b * self._operation
+
+#%% Rotation gates
 
 
 class PRot(Gate):
@@ -96,6 +98,8 @@ class R_z(PRot):
         self._pauli = qt.sigmaz()
         return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
+#%% Fixed angle single-qubit rotations
+
 
 class H(PRot):
     """Hadamard gate."""
@@ -146,6 +150,7 @@ class S(sqrtH):
         self._gate = ops.phasegate
         return self._gate(np.pi / 2, N=self._q_N, target=self._q_on)
 
+#%% Entangling gates
 
 
 class EntGate(Gate):
@@ -185,6 +190,15 @@ class sqrtiSWAP(EntGate):
     def _set_op(self):
         gate = qt.qip.operations.sqrtiswap
         return gate(self._q_N, self._q1, self._q2)
+
+
+def CZ(EntGate):
+    def _set_op(self):
+        ops = qt.qip.operations
+        self._gate = ops.cz_gate
+        return self._gate(self._q_N, self._q1, self._q2)
+
+#%% Block entangling gates
 
 
 class CHAIN(EntGate):
@@ -231,7 +245,49 @@ class ALLTOALL(EntGate):
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
 
-#%% Circuit code
+#%% 2 qubit rotation gates
+
+
+class R_zz(PRot, EntGate):
+    def __init__(self, qs_on, q_N):
+        self._q1, self._q2 = qs_on[0], qs_on[1]
+        self._q_N = q_N
+        self._theta = 0
+        self._is_param = True
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        self._gate = qt.qip.operations.rz
+        self._pauli = qt.sigmaz() #are these derivatives right?
+        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
+        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        return qt.tensor(g1, g2)
+
+    def __repr__(self):
+        name = type(self).__name__
+        angle = self._theta
+        return f"{name}({angle})@q{self._q1},q{self._q2}"
+
+
+class R_xx(R_zz):
+    def _set_op(self):
+        self._gate = qt.qip.operations.rx
+        self._pauli = qt.sigmax()
+        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
+        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        return qt.tensor(g1, g2)
+
+
+class R_yy(R_zz):
+    def _set_op(self):
+        self._gate = qt.qip.operations.ry
+        self._pauli = qt.sigmay()
+        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
+        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        return qt.tensor(g1, g2)
+
+
+#%% =============================CIRCUIT=============================
 
 
 class PQC():

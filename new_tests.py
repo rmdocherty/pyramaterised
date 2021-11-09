@@ -17,7 +17,7 @@ import PQC_lib as pqc
 
 random.seed(1) #for reproducibility
 
-#%% ===========BASIC CIRCUIT TESTS===========
+#%% =============================BASIC CIRCUIT TESTS=============================
 
 #%% HADAMARDS
 """Single Hadamard gate acting on |0> basis state should just be (sqrt(2), sqrt(2))"""
@@ -41,10 +41,8 @@ out = test_2H.gen_quantum_state()
 assert out == qt.basis(2, 0) #assert throws exception if conditional not true
 print("Action of 2 Hadamards on |0> is |0> again")
 
-#%% ENTANGLING
 
-
-#%% ===========EXPR AND ENT TESTS===========
+#%% =============================EXPR AND ENT TESTS=============================
 """Tests based on Expr baselines from Fig 1 arXiv:1905.10876v1"""
 idle_circuit = pqc.PQC(1)
 layer = [pqc.PRot(0, 1)]
@@ -133,7 +131,7 @@ circuit_11_m = Measurements(circuit_11)
 c11_out = circuit_11_m.efficient_measurements(104)
 print(f"Circuit 11 expr for {L} layers is  {c11_out['Expr']}")
 
-#%%
+#%% =============================QUANTUM GEOMETRY CIRCUIT TESTS=============================
 """Tests based on default circuit in arXiv:2102.01659v1 github"""
 qg_circuit = pqc.PQC(4)
 init_layer = [pqc.sqrtH(i, 4) for i in range(4)]
@@ -156,7 +154,7 @@ qg_circuit._quantum_state = qt.Qobj(qg_circuit.run(
         3.45319898, 0.17315902, 4.73446249, 3.38125416]))
 print(qg_circuit)
 energy = qg_circuit.energy()
-#%%
+
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
 efd = qg_m.get_effective_quantum_dimension(10**-12)
@@ -167,7 +165,7 @@ out = qg_m.efficient_measurements(500)
 entropy = out['Magic']
 print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 
-#%%
+#%% =============================ENTROPY OF MAGIC TESTS=============================
 
 
 class Bell:
@@ -185,7 +183,7 @@ print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 
 
 def gen_clifford_circuit(p, N):
-    clifford_gates = [pqc.H, pqc.S, pqc.CNOT]
+    clifford_gates = [pqc.H, pqc.S, pqc.CNOT, pqc.CZ]
     layers = []
     for i in range(p):
         layer = []
@@ -225,9 +223,9 @@ for n in range(1, max_N):
         e = c_c_m.entropy_of_magic()
         entropies.append(e)
 
-print(f"Entropies of magic are {entropies}") #values are ~0 for all so further proff code is working.
+print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
 
-#%%
+#%% =============================NPQC TESTS=============================
 """
 Testing using an NPQC as defined in https://arxiv.org/pdf/2107.14063.pdf
 Defining property of NPQC is that QFI(theta_r) = Identity, where
