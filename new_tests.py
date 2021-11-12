@@ -134,7 +134,7 @@ print(f"Circuit 11 expr for {L} layers is  {c11_out['Expr']}")
 #%% =============================QUANTUM GEOMETRY CIRCUIT TESTS=============================
 """Tests based on default circuit in arXiv:2102.01659v1 github"""
 qg_circuit = pqc.PQC(4)
-init_layer = [pqc.sqrtH(i, 4) for i in range(4)]
+init_layer = [pqc.fixed_R_y(i, 4, np.pi / 4) for i in range(4)]
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
@@ -189,13 +189,13 @@ def gen_clifford_circuit(p, N):
         layer = []
         for n in range(N):
             gate = random.choice(clifford_gates)
-            if type(gate) == pqc.PRot:
+            if type(gate) == pqc.PRot: #can't check is_param of this as not instantised yet - could make class variable?
                 q_on = random.randint(0, N - 1)
                 layer.append(gate(q_on, N))
-            elif type(gate) == pqc.EntGate:
+            elif type(gate) == pqc.EntGate: #entangling gate
                 qs = range(N)
-                q_1 = random.sample(qs) #use sample so can't pick same option twice
-                q_2 = random.sample(qs)
+                q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
+                print(q_1, q_2)
                 layer.append(gate([q_1, q_2], N))
             layers.append(layer)
     return layers
@@ -212,7 +212,7 @@ max_N = 6
 max_P = 12
 
 entropies = []
-for n in range(1, max_N):
+for n in range(2, max_N):
     for p in range(1, max_P):
         layers = gen_clifford_circuit(p, n)
         clifford_circuit = pqc.PQC(n)
@@ -224,6 +224,23 @@ for n in range(1, max_N):
         entropies.append(e)
 
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
+
+#%% Test by inserting T gates into Clifford circuits
+
+
+#%% Test by looking at magic of Haar states (should be high)
+class Haar():
+    def __init__(self, N):
+        self._n_qubits = N
+        self._quantum_state = qt.random_objects.rand_ket_haar(2**N)
+
+    def gen_quantum_state(self):
+        return qt.random_objects.rand_ket_haar(2**N)
+
+haar = Haar(2)
+haar_m = Measurements(haar)
+magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=True)
+
 
 #%% =============================NPQC TESTS=============================
 """

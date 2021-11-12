@@ -122,33 +122,42 @@ class H(PRot):
 
 
 class sqrtH(H):
-    """Sqrt hadarmard, used in the quantum geometry circuit."""
-
     def _set_op(self):
-        """sqrt Hadamard gate is just R_y(pi/4)"""
-        self._theta = np.pi / 4
         ops = qt.qip.operations
         self._gate = ops.ry
-        return self._gate(np.pi / 4, N=self._q_N, target=self._q_on)
+        return np.sqrt(ops.x_gate(self._q_N, self._q_on) * self._gate(np.pi / 2, N=self._q_N, target=self._q_on))
 
 
-class fixed_R_y(sqrtH):
-    """Fixed R_y rotation by pi/2. Needs to inherit from sqrtH so that it
-    isn't counted as a parameterised gate later in NPQC code."""
+class fixed_R_y(R_y):
+    """Fixed R_y rotation by angle theta. Isn't parameterised and angle can't
+    be changed after initialization."""
 
-    def _set_op(self):
-        self._theta = np.pi / 2
-        ops = qt.qip.operations
-        self._gate = ops.ry
-        return self._gate(np.pi / 2, N=self._q_N, target=self._q_on)
+    def __init__(self, q_on, q_N, theta):
+        self._q_on = q_on
+        self._q_N = q_N
+        self._theta = theta
+        self._is_param = False
+        self._operation = self._set_op()
+
+    def set_theta(self, theta):
+        return None
 
 
-class S(sqrtH):
+class S(H):
     def _set_op(self):
         self._theta = np.pi / 2
         ops = qt.qip.operations
         self._gate = ops.phasegate
         return self._gate(np.pi / 2, N=self._q_N, target=self._q_on)
+
+
+class T(H):
+    """T-gate."""
+
+    def _set_op(self):
+        ops = qt.qip.operations
+        self._gate = ops.t_gate
+        return self._gate(N=self._q_N, target=self._q_on)
 
 #%% Entangling gates
 
@@ -247,6 +256,8 @@ class ALLTOALL(EntGate):
 
 #%% 2 qubit rotation gates
 
+#big question - should the second qubit angle be -1 * theta ???
+
 
 class R_zz(PRot, EntGate):
     def __init__(self, qs_on, q_N):
@@ -260,7 +271,7 @@ class R_zz(PRot, EntGate):
         self._gate = qt.qip.operations.rz
         self._pauli = qt.sigmaz() #are these derivatives right?
         g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
         return qt.tensor(g1, g2)
 
     def __repr__(self):
@@ -274,7 +285,7 @@ class R_xx(R_zz):
         self._gate = qt.qip.operations.rx
         self._pauli = qt.sigmax()
         g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
         return qt.tensor(g1, g2)
 
 
@@ -283,7 +294,7 @@ class R_yy(R_zz):
         self._gate = qt.qip.operations.ry
         self._pauli = qt.sigmay()
         g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(self._theta, N=self._q_N, target=self._q2)
+        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
         return qt.tensor(g1, g2)
 
 
