@@ -17,7 +17,7 @@ class Measurements():
     def __init__(self, QC):
         self._QC = QC
 
-    def _get_QFI(self):
+    def _get_QFI(self, grad_list=[]):
         """
         Given the input QC and it's gradient state list, calculate the assoicated
         QFI matrix by finding F_i,j = Re{<d_i psi| d_j psi>} - <d_i psi|psi><psi|d_j psi>
@@ -28,8 +28,11 @@ class Measurements():
             A n_param * n_param matrix of the QFI matrix for the VQC.
         """
         n_params = len([i for i in self._QC._parameterised if i > -1]) #these should both probably be getter methods but still
-        print(f"Number of params is {n_params}")
-        grad_state_list = self._QC.get_gradients()
+        #print(f"Number of params is {n_params}")
+        if grad_list == []:
+            grad_state_list = self._QC.get_gradients()
+        else:
+            grad_state_list = grad_list
 
         #get all single elements first
         single_qfi_elements = np.zeros(n_params, dtype=np.complex128)
@@ -108,7 +111,7 @@ class Measurements():
 
         haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
         P_haar = haar / sum(haar) #do i need to normalise this?
-        
+
         expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         #P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
         #log = np.log(P_bar_Q) #take natural log of array
@@ -286,31 +289,36 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
-    def train(self, epsilon=0.010, rate=0.001, method="gradient"):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient"):
         quit_iterations = 100000
         count = 0
         diff = 1
         self._QC._quantum_state = self._QC.run()
+        psi = self._QC._quantum_state
         prev_energy = self._QC.energy()
         while diff > epsilon and count < quit_iterations:
+            if count % 100 == 0:
+                print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
             gradient_list = self._QC.get_gradients()
             gradients = []
-            for count, i in enumerate(gradient_list):
-                self._QC._quantum_state = i
-                overlap = self._QC.energy()
-                gradients.append(overlap)
+            for i in gradient_list:
+                deriv = i
+                H_di_psi = self._QC.H * deriv
+                #print(psi, H_di_psi)
+                d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
+                gradients.append(d_i_f_theta)
             theta = self._QC.get_params()
-            #print("gradients is: ", gradients)
-            #print(gradients)
-            #if method == "gradient":
-                
-            theta_update = list(np.array(theta) - rate * np.array(gradients))
-               # print(type(theta_update), theta_update)
-            #print("updated theta is: ", theta_update)
+            if method == "gradient":
+                theta_update = list(np.array(theta) - rate * np.array(gradients))
+            elif method == "QNG":
+                QFI = self._get_QFI(grad_list=gradient_list)
+                inverse = np.linalg.pinv(QFI)
+                f_inv_grad_psi = inverse.dot(np.array(gradients))
+                theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
             self._QC._quantum_state = self._QC.run(angles=theta_update)
             energy = self._QC.energy()
             diff = np.abs(energy - prev_energy)
             count += 1
             prev_energy = energy
-        print(f"Finished after {count} iterations")
+        print(f"Finished after {count} iterations with cost function = {energy}")
         return energy

@@ -309,6 +309,9 @@ class PQC():
         self._n_qubits = n_qubits
         self._n_layers = 0
         self._layers = []
+        Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
+        Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
+        self.H = Z0 * Z1
 
     def add_layer(self, layer, n=1):
         """Add $n layers to PQC._layers"""
@@ -371,12 +374,12 @@ class PQC():
             print(f"Energy of state is {e}")
         return self._quantum_state
 
-    def energy(self):
+    def energy(self, psi=None):
         """Get energy of |psi>, the initial quantum state"""
-        Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
-        Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
-        H = Z0 * Z1
-        energy = qt.expect(H, self._quantum_state)
+        if psi is None:
+            energy = qt.expect(self.H, self._quantum_state)
+        else:
+            energy = qt.expect(self.H, psi)
         return energy
 
     def take_derivative(self, g_on):

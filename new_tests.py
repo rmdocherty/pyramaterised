@@ -113,7 +113,9 @@ print(f"Circuit 2 expr for {L} layers is {c2_out['Expr']} ")
 mean, std = c2_out['Ent']
 print(f"Circuit 2 entanglement is {mean} +/- {std}")
 
-c2_mw = circuit_2_m.meyer_wallach(100)
+skip = True
+if skip is False:
+    c2_mw = circuit_2_m.meyer_wallach(100)
 #print(f"Circuit 2 MW is {c2_mw} ")
 
 #%%
@@ -143,20 +145,23 @@ layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
-qg_circuit.add_layer(layer3)
+qg_circuit.add_layer(layer3, n=1)
 
 qg_circuit.gen_quantum_state()
 
-qg_circuit._quantum_state = qt.Qobj(qg_circuit.run(
-        angles=[
-        3.21587011, 5.97193953, 0.90578156, 5.96054027,
-        1.9592948 , 2.65983852, 5.20060878, 2.571074,
-        3.45319898, 0.17315902, 4.73446249, 3.38125416]))
+# qg_circuit._quantum_state = qt.Qobj(qg_circuit.run(
+#         angles=[
+#         3.21587011, 5.97193953, 0.90578156, 5.96054027,
+#         1.9592948 , 2.65983852, 5.20060878, 2.571074,
+#         3.45319898, 0.17315902, 4.73446249, 3.38125416]))
+qg_circuit._quantum_state = qt.Qobj(qg_circuit.run())
 print(qg_circuit)
+
 energy = qg_circuit.energy()
 
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
+#%%
 efd = qg_m.get_effective_quantum_dimension(10**-12)
 print(f"Effective quantum dimension is {efd}, should be 12")
 new_measure = qg_m.new_measure()
@@ -165,6 +170,11 @@ out = qg_m.efficient_measurements(500)
 entropy = out['Magic']
 print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 
+#%% 
+"""Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
+ to 1e-6 accuracy and cost function is 0.34583907096349875"""
+qg_m.train(rate=0.001, method="QNG")
+"""Lowest we've recorded is -0.69589... but there is massive variance"""
 #%% =============================ENTROPY OF MAGIC TESTS=============================
 
 
@@ -229,19 +239,36 @@ print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0
 
 
 #%% Test by looking at magic of Haar states (should be high)
+
+"""https://arxiv.org/pdf/2011.13937.pdf says that for upper bound of magic for
+Haar states should differ from max by around ln(pi/2) for non maximum entropy states. """
+
+N = 5
+
+
 class Haar():
     def __init__(self, N):
         self._n_qubits = N
-        self._quantum_state = qt.random_objects.rand_ket_haar(2**N)
+        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        haar = qt.random_objects.rand_unitary_haar(2**N, [[2 for i in range(N)], [2 for i in range(N)]])
+        self._quantum_state = haar * circuit_state
 
     def gen_quantum_state(self):
-        return qt.random_objects.rand_ket_haar(2**N)
+        N = self._n_qubits
+        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        haar = qt.random_objects.rand_unitary_haar(2**N, [[2 for i in range(N)], [2 for i in range(N)]])
+        self._quantum_state = haar * circuit_state
+        return self._quantum_state
 
-haar = Haar(2)
-haar_m = Measurements(haar)
-magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=True)
 
-
+for i in range(2, 8):
+    haar = Haar(i)
+    haar_m = Measurements(haar)
+    magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=True)
+    m, m_std = magic['Magic']
+    upper_bound = np.log((2**i) + 1) - np.log(2)
+    print(f"Reyni entropy of magic for Haar unitary of {i} qubits is {m} +/- {m_std}, fraction of max magic is {m / upper_bound} and difference is {(upper_bound - m)}")
+#print(f"Difference may be around {np.log(np.pi/2)}")
 #%% =============================NPQC TESTS=============================
 """
 Testing using an NPQC as defined in https://arxiv.org/pdf/2107.14063.pdf
@@ -282,7 +309,7 @@ def NPQC_layers(p, N):
         #U_ent layer - not paramterised and shouldn't be counted as such!
         for k in range(1, 1 + N // 2):
             q_on = 2 * k - 2
-            rotation = pqc.fixed_R_y(q_on, N) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
+            rotation = pqc.fixed_R_y(q_on, N, np.pi / 2) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
             fixed_rots.append(rotation)
             U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
             cphases.append(U_ent)
@@ -330,3 +357,6 @@ for N in range(4, 10, 2): #step=2 for even N
         masked = np.where(QFI < 10**-12, 0, QFI)
         check_iden(masked)
         print("\n")
+
+#%%
+
