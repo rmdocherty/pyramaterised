@@ -7,13 +7,14 @@ Created on Sat Oct 16 13:40:05 2021
 """
 
 from measurement import Measurements
-from helper_functions import pretty_subplot
+from helper_functions import pretty_subplot, pretty_graph
 from math import isclose
 import matplotlib.pyplot as plt
 import qutip as qt
 import numpy as np
 import random
 import PQC_lib as pqc
+from copy import copy
 
 random.seed(1) #for reproducibility
 
@@ -199,15 +200,14 @@ def gen_clifford_circuit(p, N):
         layer = []
         for n in range(N):
             gate = random.choice(clifford_gates)
-            if type(gate) == pqc.PRot: #can't check is_param of this as not instantised yet - could make class variable?
+            if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
                 q_on = random.randint(0, N - 1)
                 layer.append(gate(q_on, N))
-            elif type(gate) == pqc.EntGate: #entangling gate
-                qs = range(N)
+            elif issubclass(gate, pqc.EntGate): #entangling gate
+                qs = list(range(N))
                 q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
-                print(q_1, q_2)
                 layer.append(gate([q_1, q_2], N))
-            layers.append(layer)
+        layers.append(layer)
     return layers
 
 
@@ -236,8 +236,41 @@ for n in range(2, max_N):
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
 
 #%% Test by inserting T gates into Clifford circuits
+p = 30
+N = 4
+all_entropies = []
+#%%
+N_repeats = 15
 
+for n in range(N_repeats):
+    clifford_layers = gen_clifford_circuit(p, N)
+    entropies = []
 
+    for i in range(p // 2): #want to insert in middle of circuit
+        print(f"Inserting {(i+1) * N} T gates")
+        insertion_point = i + p // 4 #insert from the quarter upwards
+        clifford_layers[insertion_point] = clifford_layers[insertion_point] + [pqc.T(i, N) for i in range(N)]
+        insert_circuit = pqc.PQC(N)
+        for l in clifford_layers:
+            insert_circuit.add_layer(l)
+        insert_circuit._quantum_state = qt.Qobj(insert_circuit.run())
+        i_c_m = Measurements(insert_circuit)
+        e = i_c_m.efficient_measurements(100, expr=False, ent=False, eom=True)
+        entropies.append(e['Magic'][0])
+
+    entropies = np.array(entropies)
+    max_magic = np.log((2**N) + 1) - np.log(2)
+    entropies = entropies / max_magic
+    all_entropies.append(entropies)
+
+#%%
+magics = np.mean(all_entropies, axis=0)
+magic_stds = np.std(all_entropies, axis=0) #/ np.sqrt(len(all_entropies))
+x = [(i + 1) * N for i in range(p // 2)]
+plt.errorbar(x, magics, yerr=magic_stds, ls="", marker=".", lw=2, ms=0, label=f"Standard deviation over {N_repeats*4} repeats", color="darkblue")
+plt.plot(x, magics, ls="-", marker=".", lw=4, ms=15, color="cornflowerblue")
+pretty_graph("Number of T-Gates", "Fractional Reyni Entropy of Magic", f"T-Gate injection on {N}-qubit, {p}-layer Clifford Circuit", 20)
+plt.legend(fontsize=18)
 #%% Test by looking at magic of Haar states (should be high)
 
 """https://arxiv.org/pdf/2011.13937.pdf says that for upper bound of magic for

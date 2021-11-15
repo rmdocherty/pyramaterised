@@ -201,7 +201,7 @@ class sqrtiSWAP(EntGate):
         return gate(self._q_N, self._q1, self._q2)
 
 
-def CZ(EntGate):
+class CZ(EntGate):
     def _set_op(self):
         ops = qt.qip.operations
         self._gate = ops.cz_gate
@@ -309,9 +309,10 @@ class PQC():
         self._n_qubits = n_qubits
         self._n_layers = 0
         self._layers = []
-        Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
-        Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
-        self.H = Z0 * Z1
+        if n_qubits >= 2:
+            Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
+            Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
+            self.H = Z0 * Z1
 
     def add_layer(self, layer, n=1):
         """Add $n layers to PQC._layers"""
