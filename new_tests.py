@@ -145,9 +145,13 @@ layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
-qg_circuit.add_layer(layer3, n=1)
+qg_circuit.add_layer(layer3, n=20)
 
 qg_circuit.gen_quantum_state()
+default_angles = angles=[
+        3.21587011, 5.97193953, 0.90578156, 5.96054027,
+        1.9592948 , 2.65983852, 5.20060878, 2.571074,
+        3.45319898, 0.17315902, 4.73446249, 3.38125416]
 
 # qg_circuit._quantum_state = qt.Qobj(qg_circuit.run(
 #         angles=[
@@ -173,7 +177,7 @@ print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%% 
 """Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
  to 1e-6 accuracy and cost function is 0.34583907096349875"""
-qg_m.train(rate=0.001, method="QNG")
+qg_m.train(rate=0.001, method="QNG", angles=[])
 """Lowest we've recorded is -0.69589... but there is massive variance"""
 #%% =============================ENTROPY OF MAGIC TESTS=============================
 
@@ -231,7 +235,7 @@ for i in range(10):
 """https://arxiv.org/pdf/2011.13937.pdf says that for upper bound of magic for
 Haar states should differ from max by around ln(pi/2) for non maximum entropy states. """
 
-N = 5
+N = 4
 
 
 class Haar():
@@ -255,7 +259,11 @@ for i in range(2, 8):
     magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=True)
     m, m_std = magic['Magic']
     upper_bound = np.log((2**i) + 1) - np.log(2)
-    print(f"Reyni entropy of magic for Haar unitary of {i} qubits is {m} +/- {m_std}, fraction of max magic is {m / upper_bound} and difference is {(upper_bound - m)}")
+    #print(f"Reyni entropy of magic for Haar unitary of {i} qubits is {m} +/- {m_std}, fraction of max magic is {m / upper_bound} and difference is {(upper_bound - m)}")
+    print(f" {i} qubits EoM is {m / upper_bound}")
+    avg_magic = np.log(3 + 2**i) - np.log(4)
+    frac_avg = avg_magic / upper_bound
+    print(f"Expected fractional magic is {frac_avg}")
 #print(f"Difference may be around {np.log(np.pi/2)}")
 #%% =============================NPQC TESTS=============================
 """
@@ -304,3 +312,28 @@ for N in range(4, 10, 2): #step=2 for even N
 
 #%%
 
+test = pqc.PQC(4)
+test_layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
+         pqc.CHAIN(pqc.CPHASE, 4),
+         pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
+test.add_layer(test_layer)
+
+
+def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
+    layers_to_add = [circuit.get_layer(i) for i in layer_index_list]
+    prev_rank, rank_diff = 0, 1
+    count = 0
+    while rank_diff > epsilon and count < 1e6:
+        for l in layers_to_add:
+            circuit.add_layer(l)
+        circuit.gen_quantum_state()
+        circuit_m = Measurements(circuit)
+        QFI = circuit_m._get_QFI()
+        rank = np.linalg.matrix_rank(QFI)
+        rank_diff = np.abs(rank - prev_rank)
+        print(f"Iteration {count}, r0={prev_rank}, r1={rank}, delta = {rank_diff}")
+        prev_rank = rank
+        count += 1
+    return count
+
+op = find_overparam_point(test, [0])

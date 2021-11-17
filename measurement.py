@@ -289,11 +289,11 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient"):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[]):
         quit_iterations = 100000
         count = 0
         diff = 1
-        self._QC._quantum_state = self._QC.run()
+        self._QC._quantum_state = self._QC.run(angles=angles)
         psi = self._QC._quantum_state
         prev_energy = self._QC.energy()
         while diff > epsilon and count < quit_iterations:

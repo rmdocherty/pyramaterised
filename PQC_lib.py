@@ -326,6 +326,9 @@ class PQC():
         self._layers[pos] = deepcopy(layer)
         self.set_gates()
 
+    def get_layer(self, pos):
+        return self._layers[pos]
+
     def set_gates(self):
         """For each layer in layer, append it to gates. If layers is a nested list
         of layers, then gates is a flat list of each gate operation in order. Then

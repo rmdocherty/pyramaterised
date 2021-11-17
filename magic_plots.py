@@ -9,11 +9,12 @@ import PQC_lib as pqc
 import qutip as qt
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 from measurement import Measurements
 from circuit_structures import gen_clifford_circuit
 from helper_functions import pretty_graph
 
-
+#%%
 p = 10
 N = 4
 all_entropies = []
@@ -77,7 +78,27 @@ for i in range(len(files)):
     label = f"{N} qubits"
     magic = np.load(magic_paths[i])
     magic_std = np.load(std_paths[i])
-    # if i == 1:
-    #     magic = magic[:20]
-    #     magic_std = magic_std[:20] / np.sqrt(len(magic_std))
     plot_magic(N, p, magic, magic_std, magic_colors[i], std_colors[i], label, title_str)
+
+#%%
+
+p = 60
+N = 4
+N_gates = 6
+
+entropies = []
+
+clifford_layers = gen_clifford_circuit(p, N)
+for g in range(N_gates):
+    insertion_point = random.randint(p//4, (3 * p) //4)
+    q_on = random.randint(0, N - 1)
+    clifford_layers[insertion_point] = clifford_layers[insertion_point] + [pqc.T(q_on, N)]
+    insert_circuit = pqc.PQC(N)
+    for l in clifford_layers:
+        insert_circuit.add_layer(l)
+    insert_circuit._quantum_state = qt.Qobj(insert_circuit.run())
+    i_c_m = Measurements(insert_circuit)
+    e = i_c_m.efficient_measurements(1, expr=False, ent=False, eom=True)
+    entropies.append(e['Magic'][0])
+
+print(entropies)
