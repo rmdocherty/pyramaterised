@@ -9,6 +9,7 @@ import PQC_lib as pqc
 import qutip as qt
 import numpy as np
 import random
+from measurement import Measurements
 
 
 def gen_clifford_circuit(p, N):
@@ -27,7 +28,6 @@ def gen_clifford_circuit(p, N):
                 layer.append(gate([q_1, q_2], N))
         layers.append(layer)
     return layers
-
 
 
 def gen_shift_list(p, N):
@@ -74,3 +74,21 @@ def NPQC_layers(p, N):
             angles.append(0)
         layers.append(p_layer)
     return layers, angles
+
+
+def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
+    layers_to_add = [circuit.get_layer(i) for i in layer_index_list]
+    prev_rank, rank_diff = 0, 1
+    count = 0
+    while rank_diff > epsilon and count < 1e6:
+        for l in layers_to_add:
+            circuit.add_layer(l)
+        circuit.gen_quantum_state()
+        circuit_m = Measurements(circuit)
+        QFI = circuit_m._get_QFI()
+        rank = np.linalg.matrix_rank(QFI)
+        rank_diff = np.abs(rank - prev_rank)
+        print(f"Iteration {count}, r0={prev_rank}, r1={rank}, delta = {rank_diff}")
+        prev_rank = rank
+        count += 1
+    return count

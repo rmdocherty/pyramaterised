@@ -9,11 +9,13 @@ Created on Sat Oct 16 13:40:05 2021
 import PQC_lib as pqc
 import qutip as qt
 import numpy as np
+import matplotlib.pyplot as plt
 import random
 
 from measurement import Measurements
 from math import isclose
-from circuit_structures import gen_clifford_circuit, NPQC_layers
+from circuit_structures import gen_clifford_circuit, NPQC_layers, find_overparam_point
+from helper_functions import pretty_graph
 
 random.seed(1) #for reproducibility
 
@@ -232,8 +234,13 @@ for i in range(10):
 
 #%% Test by looking at magic of Haar states (should be high)
 
-"""https://arxiv.org/pdf/2011.13937.pdf says that for upper bound of magic for
-Haar states should differ from max by around ln(pi/2) for non maximum entropy states. """
+"""
+Accoring to https://arxiv.org/pdf/2106.12587.pdf , the expected reyni entropy
+of magic for haar random states is log(3 + 2^N) - log(4). Seems to match up
+well, though note some measured EoMs are ever so slightly less than the analytic
+value, which shouldn't be the case as these are lower bounds. Will chalk this
+up to computational error at this point.
+"""
 
 N = 4
 
@@ -260,11 +267,11 @@ for i in range(2, 8):
     m, m_std = magic['Magic']
     upper_bound = np.log((2**i) + 1) - np.log(2)
     #print(f"Reyni entropy of magic for Haar unitary of {i} qubits is {m} +/- {m_std}, fraction of max magic is {m / upper_bound} and difference is {(upper_bound - m)}")
-    print(f" {i} qubits EoM is {m / upper_bound}")
+    print(f"{i} qubit Haar state EoM is {m / upper_bound}")
     avg_magic = np.log(3 + 2**i) - np.log(4)
     frac_avg = avg_magic / upper_bound
     print(f"Expected fractional magic is {frac_avg}")
-#print(f"Difference may be around {np.log(np.pi/2)}")
+
 #%% =============================NPQC TESTS=============================
 """
 Testing using an NPQC as defined in https://arxiv.org/pdf/2107.14063.pdf
@@ -275,8 +282,6 @@ generate each NPQC with N qubits and P <= 2**(N/2) layers and check it's QFI
 is the identity when initialised with theta_r - this means every off diagonal
 element of the QFI should be 0, which is checked for in check_iden().
 """
-
-
 
 
 def check_iden(A):
@@ -312,28 +317,26 @@ for N in range(4, 10, 2): #step=2 for even N
 
 #%%
 
+"""
+Add layers to a PQC until the rank of the QFI saturates - this indicates
+overparameterisation and should lead to a favorable cost function landscape and
+easy training.
+"""
+
 test = pqc.PQC(4)
 test_layer = [pqc.H(0, 4), pqc.H(1, 4), pqc.H(2, 4), pqc.H(3,4), 
-         pqc.CHAIN(pqc.CPHASE, 4),
-         pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
-test.add_layer(test_layer)
+                          pqc.CHAIN(pqc.CPHASE, 4),
+              pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_x(3, 4)]
+test.add_layer(test_layer, n=1)
 
-
-def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
-    layers_to_add = [circuit.get_layer(i) for i in layer_index_list]
-    prev_rank, rank_diff = 0, 1
-    count = 0
-    while rank_diff > epsilon and count < 1e6:
-        for l in layers_to_add:
-            circuit.add_layer(l)
-        circuit.gen_quantum_state()
-        circuit_m = Measurements(circuit)
-        QFI = circuit_m._get_QFI()
-        rank = np.linalg.matrix_rank(QFI)
-        rank_diff = np.abs(rank - prev_rank)
-        print(f"Iteration {count}, r0={prev_rank}, r1={rank}, delta = {rank_diff}")
-        prev_rank = rank
-        count += 1
-    return count
 
 op = find_overparam_point(test, [0])
+print(f"Test circuit overparameterised after {op} layesr added")
+#%%
+test_m = Measurements(test)
+ener, traj = test_m.train(trajectory=True)
+
+
+iterations = range(len(traj))
+plt.plot(iterations, traj, lw=4)
+pretty_graph("Iterations", "Cost function", "Cost function vs iterations for overparameterised PQC", 20)

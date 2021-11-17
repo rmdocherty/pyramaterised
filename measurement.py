@@ -289,16 +289,23 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[]):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False):
         quit_iterations = 100000
         count = 0
         diff = 1
+        traj = []
+
+        if magic is True:
+            P_n = self._gen_pauli_group()
+            magics = []
+
         self._QC._quantum_state = self._QC.run(angles=angles)
         psi = self._QC._quantum_state
         prev_energy = self._QC.energy()
         while diff > epsilon and count < quit_iterations:
             if count % 100 == 0:
                 print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
+
             gradient_list = self._QC.get_gradients()
             gradients = []
             for i in gradient_list:
@@ -308,6 +315,7 @@ class Measurements():
                 d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
                 gradients.append(d_i_f_theta)
             theta = self._QC.get_params()
+
             if method == "gradient":
                 theta_update = list(np.array(theta) - rate * np.array(gradients))
             elif method == "QNG":
@@ -315,10 +323,21 @@ class Measurements():
                 inverse = np.linalg.pinv(QFI)
                 f_inv_grad_psi = inverse.dot(np.array(gradients))
                 theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
+    
+            if magic is True:
+                eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+                magics.append(eom)
+    
             self._QC._quantum_state = self._QC.run(angles=theta_update)
             energy = self._QC.energy()
             diff = np.abs(energy - prev_energy)
             count += 1
             prev_energy = energy
+            traj.append(energy)
         print(f"Finished after {count} iterations with cost function = {energy}")
-        return energy
+        if trajectory is True:
+            return energy, traj
+        if magic is True:
+            return energy, magics
+        else:
+            return energy

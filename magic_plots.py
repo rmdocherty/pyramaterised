@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from measurement import Measurements
-from circuit_structures import gen_clifford_circuit
+from circuit_structures import gen_clifford_circuit, NPQC_layers, find_overparam_point
 from helper_functions import pretty_graph
 
 #%%
@@ -102,3 +102,21 @@ for g in range(N_gates):
     entropies.append(e['Magic'][0])
 
 print(entropies)
+
+#%%
+P, N = 6, 6
+
+layers, theta_ref = NPQC_layers(P, N)
+train_NPQC = pqc.PQC(N)
+for l in layers:
+    train_NPQC.add_layer(l)
+
+train_NPQC_m = Measurements(train_NPQC)
+ener, magics = train_NPQC_m.train(method="QNG", magic=True, angles=theta_ref) #theta_ref
+#%% Really interesting results - when initialised with theta_ref, training always seems to take 1762 iterations and gives really nice gaussian
+#magics = np.load('data/magics_npqc_training_4l_4q.npy')
+max_magic = np.log((2**N) + 1) - np.log(2)
+magics = np.array(magics) / max_magic
+iterations = range(len(magics))
+plt.plot(iterations, magics, lw=4)
+pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", "Magic during NPQC training initialised with reference param", 20)
