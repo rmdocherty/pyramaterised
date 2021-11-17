@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 17 12:19:54 2021
+
+@author: ronan
+"""
+import PQC_lib as pqc
+import qutip as qt
+import numpy as np
+import random
+
+
+def gen_clifford_circuit(p, N):
+    clifford_gates = [pqc.H, pqc.S, pqc.CNOT, pqc.CZ]
+    layers = []
+    for i in range(p):
+        layer = []
+        for n in range(N):
+            gate = random.choice(clifford_gates)
+            if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
+                q_on = random.randint(0, N - 1)
+                layer.append(gate(q_on, N))
+            elif issubclass(gate, pqc.EntGate): #entangling gate
+                qs = list(range(N))
+                q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
+                layer.append(gate([q_1, q_2], N))
+        layers.append(layer)
+    return layers
+
+
+
+def gen_shift_list(p, N):
+    #lots of -1 as paper indexing is 1-based and list-indexing 0 based
+    A = [i for i in range(N // 2)]
+    s = 1
+    shift_list = np.zeros(2**(N // 2), dtype=np.int32) #we have at most 2^(N/2) layers
+    while A != []:
+        r = A.pop(0) #get first elem out of A
+        shift_list[s - 1] = r #a_s
+        qs = [i for i in range(1, s)] #count up from 1 to s-1
+        for q in qs:
+            shift_list[s + q - 1] = shift_list[q - 1] #a_s+q = a_q
+        s = 2 * s
+    return shift_list
+
+
+def NPQC_layers(p, N):
+    #started with fixed block of N R_y and N R_x as first layer
+    initial_layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)]
+    angles = [np.pi / 2 for i in range(N)] + [0 for i in range(N)]
+    layers = [initial_layer]
+    shift_list = gen_shift_list(p, N)
+    for i in range(0, p - 1):
+        p_layer = []
+        a_l = shift_list[i]
+        fixed_rots, cphases = [], []
+        #U_ent layer - not paramterised and shouldn't be counted as such!
+        for k in range(1, 1 + N // 2):
+            q_on = 2 * k - 2
+            rotation = pqc.fixed_R_y(q_on, N, np.pi / 2) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
+            fixed_rots.append(rotation)
+            U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
+            cphases.append(U_ent)
+        p_layer = fixed_rots + cphases #need fixed r_y to come before c_phase
+
+        #rotation layer - R_y then R_z on each kth qubit
+        for k in range(1, N // 2 + 1):
+            q_on = 2 * k - 2
+            p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
+            #R_y gates have theta_i = pi/2 for theta_r
+            angles.append(np.pi / 2)
+            #R_z gates have theta_i = 0 for theta_r
+            angles.append(0)
+        layers.append(p_layer)
+    return layers, angles

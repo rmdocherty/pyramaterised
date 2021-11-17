@@ -6,16 +6,14 @@ Created on Sat Oct 16 13:40:05 2021
 @author: ronan
 """
 
-from measurement import Measurements
-from helper_functions import pretty_subplot, pretty_graph
-from math import isclose
-import matplotlib.pyplot as plt
+import PQC_lib as pqc
 import qutip as qt
 import numpy as np
-import scipy as sp
 import random
-import PQC_lib as pqc
-from copy import copy
+
+from measurement import Measurements
+from math import isclose
+from circuit_structures import gen_clifford_circuit, NPQC_layers
 
 random.seed(1) #for reproducibility
 
@@ -194,24 +192,6 @@ e = bell_m.entropy_of_magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 
 
-def gen_clifford_circuit(p, N):
-    clifford_gates = [pqc.H, pqc.S, pqc.CNOT, pqc.CZ]
-    layers = []
-    for i in range(p):
-        layer = []
-        for n in range(N):
-            gate = random.choice(clifford_gates)
-            if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
-                q_on = random.randint(0, N - 1)
-                layer.append(gate(q_on, N))
-            elif issubclass(gate, pqc.EntGate): #entangling gate
-                qs = list(range(N))
-                q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
-                layer.append(gate([q_1, q_2], N))
-        layers.append(layer)
-    return layers
-
-
 """
 Generate max_N * max_P circuits comprised entriely of random clifford gates
 from the group {H, S, CNOT} with n qubits, p layers and n operations per layer.
@@ -236,76 +216,15 @@ for n in range(2, max_N):
 
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
 
-#%% Test by inserting T gates into Clifford circuits
-p = 40
-N = 4
-all_entropies = []
+#%% Just see if it's generating random clifford circuits
+N, P = 4, 5
 
-N_repeats = 1000
-
-for n in range(N_repeats):
-    clifford_layers = gen_clifford_circuit(p, N)
-    entropies = []
-    if n % 100 == 0:
-        print(f"{n} circuits computed")
-    for i in range(p // 2): #want to insert in middle of circuit
-        #print(f"Inserting {(i+1) * N} T gates")
-        insertion_point = i + p // 4 #insert from the quarter upwards
-        clifford_layers[insertion_point] = clifford_layers[insertion_point] + [pqc.T(i, N) for i in range(N)]
-        insert_circuit = pqc.PQC(N)
-        for l in clifford_layers:
-            insert_circuit.add_layer(l)
-        insert_circuit._quantum_state = qt.Qobj(insert_circuit.run())
-        i_c_m = Measurements(insert_circuit)
-        e = i_c_m.efficient_measurements(1, expr=False, ent=False, eom=True)
-        entropies.append(e['Magic'][0])
-
-    entropies = np.array(entropies)
-    max_magic = np.log((2**N) + 1) - np.log(2)
-    entropies = entropies / max_magic
-    all_entropies.append(entropies)
-
-#%%
-stderr = True
-magics = np.mean(all_entropies, axis=0)
-if stderr:
-    magic_stds = np.std(all_entropies, axis=0) / np.sqrt(len(all_entropies))
-    label_str = f"Standard error of the mean over {len(all_entropies)} repeats"
-else:
-    magic_stds = np.std(all_entropies, axis=0)
-    label_str = f"Standard deviation over {len(all_entropies)} repeats"
-    
-def plot_magic(N, p, magics, magic_stds, color, std_color, label_str, title_str):
-    n_t_gates = np.array([(i + 1) for i in range(p // 2)])
-    print(len(n_t_gates), len(magic), len(magic_stds), N, p)
-    plt.errorbar(n_t_gates, magics, yerr=magic_stds, ls="", marker=".", lw=2, ms=0, color=std_color)
-    plt.plot(n_t_gates, magics, ls="-", marker=".", lw=4, ms=15, color=color, label=label_str)
-    pretty_graph("Number of T-Gates layers", "Fractional Reyni Entropy of Magic", title_str, 20)
-    plt.legend(fontsize=18)
-
-
-default_title = f"T-Gate injection on {N}-qubit, {p}-layer Clifford Circuit"
-plot_magic(N, p, magics, magic_stds, "cornflowerblue", "darkblue", label_str, default_title)
-
-#%%
-files = [f"magic_t_gate_1000r_{n}q_40l.npy" for n in range(3,6)] #"magic_t_gate_1000r_4q_4l.npy", "magic_t_gate_1000r_5q_40l.npy"
-stds = [f[:5] + "_std" + f[5:] for f in files]
-magic_paths = ["data/" + f for f in files]
-std_paths = ["data/" + f for f in stds]
-magic_colors = ["lightgreen", "cornflowerblue", "orange"]
-std_colors = ["darkgreen", "darkblue", "darkorange"]
-
-title_str = f"T-Gate injection on N-qubit, 40-layer Clifford Circuit"
-p = 40
-for i in range(len(files)):
-    N = i + 3
-    label = f"{N} qubits"
-    magic = np.load(magic_paths[i])
-    magic_std = np.load(std_paths[i])
-    # if i == 1:
-    #     magic = magic[:20]
-    #     magic_std = magic_std[:20] / np.sqrt(len(magic_std))
-    plot_magic(N, p, magic, magic_std, magic_colors[i], std_colors[i], label, title_str)
+for i in range(10):
+    layers = gen_clifford_circuit(P, N)
+    clifford_circuit = pqc.PQC(N)
+    for l in layers:
+        clifford_circuit.add_layer(l)
+    print(clifford_circuit)
 
 #%% Test by looking at magic of Haar states (should be high)
 
@@ -350,50 +269,6 @@ element of the QFI should be 0, which is checked for in check_iden().
 """
 
 
-def gen_shift_list(p, N):
-    #lots of -1 as paper indexing is 1-based and list-indexing 0 based
-    A = [i for i in range(N // 2)]
-    s = 1
-    shift_list = np.zeros(2**(N // 2), dtype=np.int32) #we have at most 2^(N/2) layers
-    while A != []:
-        r = A.pop(0) #get first elem out of A
-        shift_list[s - 1] = r #a_s
-        qs = [i for i in range(1, s)] #count up from 1 to s-1
-        for q in qs:
-            shift_list[s + q - 1] = shift_list[q - 1] #a_s+q = a_q
-        s = 2 * s
-    return shift_list
-
-
-def NPQC_layers(p, N):
-    #started with fixed block of N R_y and N R_x as first layer
-    initial_layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)]
-    angles = [np.pi / 2 for i in range(N)] + [0 for i in range(N)]
-    layers = [initial_layer]
-    shift_list = gen_shift_list(p, N)
-    for i in range(0, p - 1):
-        p_layer = []
-        a_l = shift_list[i]
-        fixed_rots, cphases = [], []
-        #U_ent layer - not paramterised and shouldn't be counted as such!
-        for k in range(1, 1 + N // 2):
-            q_on = 2 * k - 2
-            rotation = pqc.fixed_R_y(q_on, N, np.pi / 2) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
-            fixed_rots.append(rotation)
-            U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
-            cphases.append(U_ent)
-        p_layer = fixed_rots + cphases #need fixed r_y to come before c_phase
-
-        #rotation layer - R_y then R_z on each kth qubit
-        for k in range(1, N // 2 + 1):
-            q_on = 2 * k - 2
-            p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
-            #R_y gates have theta_i = pi/2 for theta_r
-            angles.append(np.pi / 2)
-            #R_z gates have theta_i = 0 for theta_r
-            angles.append(0)
-        layers.append(p_layer)
-    return layers, angles
 
 
 def check_iden(A):
