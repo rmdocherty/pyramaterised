@@ -38,6 +38,19 @@ class Gate():
         else:
             return b * self._operation
 
+    def __add__(self, b):
+        if isinstance(b, Gate):
+            return self._operation + b._operation
+        else:
+            return self._operation + b
+
+    def __radd__(self, b):
+        if isinstance(b, Gate):
+            return b._operation + self._operation
+        else:
+            return b + self._operation
+
+
 #%% Rotation gates
 
 
@@ -253,13 +266,45 @@ class ALLTOALL(EntGate):
 
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
+#%%
+
+
+class shared_parameter(PRot):
+    def __init__(self, layer, q_N):
+        self._layer = layer
+        self._theta = 0
+        self._q_N = q_N
+        self._is_param = True
+        self._operation = self._set_op()
+
+    def derivative(self):
+        """H=sum(H_s) -> d_theta U = d_theta (e^i*H*theta) = sum(H_s * U)"""
+        deriv = 0
+        for g in self._layer:
+            single_deriv = g.derivative()
+            deriv = deriv + single_deriv
+        return deriv
+
+    def set_theta(self, theta):
+        self._theta = theta
+        for gate in self._layer:
+            gate.set_theta(theta)
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        operation = prod(self._layer[::-1])
+        return operation
+
+    def __repr__(self):
+        return f"Block of {self._layer}"
+
 
 #%% 2 qubit rotation gates
 
 #big question - should the second qubit angle be -1 * theta ???
 
 
-class R_zz(PRot, EntGate):
+class RR(PRot, EntGate):
     def __init__(self, qs_on, q_N):
         self._q1, self._q2 = qs_on[0], qs_on[1]
         self._q_N = q_N
@@ -268,35 +313,77 @@ class R_zz(PRot, EntGate):
         self._operation = self._set_op()
 
     def _set_op(self):
-        self._gate = qt.qip.operations.rz
-        self._pauli = qt.sigmaz() #are these derivatives right?
-        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
-        return qt.tensor(g1, g2)
+        self._gate = iden
+        self._pauli = iden #are these derivatives right?
+        g1 = self._gate(N=self._q_N)
+        g2 = self._gate(N=self._q_N)
+        return g1 * g2
+
+    def derivative(self):
+        """Derivative of XX/YY/ZZ is -i * tensor(sigmai, sigmai) /2"""
+        fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
+        fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
+        deriv = -1j * (fock1 * fock2) / 2
+        return deriv
 
     def __repr__(self):
         name = type(self).__name__
         angle = self._theta
-        return f"{name}({angle})@q{self._q1},q{self._q2}"
+        return f"{name}({angle:.2f})@q{self._q1},q{self._q2}"
 
 
-class R_xx(R_zz):
+class R_zz(RR):
+    def _set_op(self):
+        self._gate = qt.qip.operations.rz
+        self._pauli = qt.sigmaz() #are these derivatives right?
+        #g1 = self._gate(self._theta, target=self._q1)
+        #g2 = self._gate(-1 * self._theta, target=self._q2)
+        fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
+        fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
+        preexp = -1j * 0.5 * self._theta * fock1 * fock2
+        to_expo = qt.Qobj(preexp)
+        op = to_expo.expm()
+        return op
+
+
+class R_xx(RR):
     def _set_op(self):
         self._gate = qt.qip.operations.rx
         self._pauli = qt.sigmax()
         g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
         g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
-        return qt.tensor(g1, g2)
+        return g1 * g2
 
 
-class R_yy(R_zz):
+class R_yy(RR):
     def _set_op(self):
         self._gate = qt.qip.operations.ry
         self._pauli = qt.sigmay()
         g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
         g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
-        return qt.tensor(g1, g2)
+        return g1 * g2
 
+
+class RR_block(shared_parameter):
+    def __init__(self, rotator, q_N):
+        self._rotator = rotator
+        self._theta = 0
+        self._q_N = q_N
+        self._is_param = True
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        N = self._q_N
+        indices = []
+        for i in range(N):
+            index_pair = [i, (i + 1) % N] #boundary condition that N+1 = 0
+            indices.append(index_pair)
+        self._layer = [self._rotator(index_pair, N) for index_pair in indices]
+        operation = prod(self._layer[::-1])
+        return operation
+
+    def __repr__(self):
+        return f"RR block of {self._layer}"
 
 #%% =============================CIRCUIT=============================
 

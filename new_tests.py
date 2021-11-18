@@ -14,7 +14,7 @@ import random
 
 from measurement import Measurements
 from math import isclose
-from circuit_structures import gen_clifford_circuit, NPQC_layers, find_overparam_point
+from circuit_structures import gen_clifford_circuit, NPQC_layers, find_overparam_point, gen_TFIM_layers
 from helper_functions import pretty_graph
 
 random.seed(1) #for reproducibility
@@ -334,9 +334,31 @@ op = find_overparam_point(test, [0])
 print(f"Test circuit overparameterised after {op} layesr added")
 #%%
 test_m = Measurements(test)
-ener, traj = test_m.train(trajectory=True)
+ener, traj, *others = test_m.train(trajectory=True)
 
 
 iterations = range(len(traj))
 plt.plot(iterations, traj, lw=4)
 pretty_graph("Iterations", "Cost function", "Cost function vs iterations for overparameterised PQC", 20)
+
+#%%
+
+"""
+Test TFIM overparameterisation values for different N
+"""
+
+N, p = 4, 6
+
+TFIM = pqc.PQC(N)
+TFIM_layers = gen_TFIM_layers(1, N)
+for l in TFIM_layers:
+    TFIM.add_layer(l)
+print(TFIM)
+op = find_overparam_point(TFIM, [1])
+print(f"{N} qubit TFIM overparameterised after {op + 1} layers")
+
+#%%
+TFIM.set_params()
+print(TFIM)
+TFIM_m = Measurements(TFIM)
+out = TFIM_m.train(method='QNG')

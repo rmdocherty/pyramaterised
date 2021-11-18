@@ -294,10 +294,11 @@ class Measurements():
         count = 0
         diff = 1
         traj = []
+        magics = []
 
         if magic is True:
             P_n = self._gen_pauli_group()
-            magics = []
+            
 
         self._QC._quantum_state = self._QC.run(angles=angles)
         psi = self._QC._quantum_state
@@ -335,9 +336,4 @@ class Measurements():
             prev_energy = energy
             traj.append(energy)
         print(f"Finished after {count} iterations with cost function = {energy}")
-        if trajectory is True:
-            return energy, traj
-        if magic is True:
-            return energy, magics
-        else:
-            return energy
+        return [energy, traj, magics]

@@ -11,22 +11,40 @@ import numpy as np
 import random
 from measurement import Measurements
 
+LEN_CLIFF_STRING = 3
 
-def gen_clifford_circuit(p, N):
-    clifford_gates = [pqc.H, pqc.S, pqc.CNOT, pqc.CZ]
+
+def gen_clifford_circuit(p, N, method='random'):
+    clifford_gates = [pqc.H, pqc.S, pqc.CZ, pqc.CNOT]
     layers = []
-    for i in range(p):
-        layer = []
-        for n in range(N):
-            gate = random.choice(clifford_gates)
-            if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
-                q_on = random.randint(0, N - 1)
-                layer.append(gate(q_on, N))
-            elif issubclass(gate, pqc.EntGate): #entangling gate
-                qs = list(range(N))
-                q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
-                layer.append(gate([q_1, q_2], N))
-        layers.append(layer)
+    qs = list(range(N))
+
+    if method.lower() == 'random':
+        for i in range(p):
+            layer = []
+            for n in range(N):
+                gate = random.choice(clifford_gates)
+                if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
+                    q_on = random.randint(0, N - 1)
+                    layer.append(gate(q_on, N))
+                elif issubclass(gate, pqc.EntGate): #entangling gate
+                    q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
+                    layer.append(gate([q_1, q_2], N))
+            layers.append(layer)
+    else:
+        single_qubit_ops = clifford_gates[:2]
+        for i in range(p):
+            layer = []
+            qs_on = random.sample(qs, k=N//2)
+            strings = [random.choices(single_qubit_ops, k=LEN_CLIFF_STRING) for i in qs_on]
+            #add single qubit clifford strings
+            count = 0
+            for string in strings:
+                for gate in string:
+                    layer.append(gate(qs_on[count], N))
+                count += 1
+            layer.append(pqc.CHAIN(pqc.CNOT, N)) #add entangling layer
+            layers.append(layer)
     return layers
 
 
@@ -92,3 +110,17 @@ def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
         prev_rank = rank
         count += 1
     return count
+
+
+def gen_TFIM_layers(p, N):
+    layers = []
+    init_layer = [pqc.H(i, N) for i in range(N)]
+    layers.append(init_layer)
+    for i in range(p):
+        first_half = [pqc.RR_block(pqc.R_zz, N)]
+        second_layer = [pqc.R_x(i, N) for i in range(N)]
+        second_half = [pqc.shared_parameter(second_layer, N)]
+        layer = first_half + second_half
+        layers.append(layer)
+    return layers
+        

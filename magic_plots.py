@@ -71,7 +71,7 @@ std_paths = ["data/" + f for f in stds]
 magic_colors = ["lightgreen", "cornflowerblue", "orange"]
 std_colors = ["darkgreen", "darkblue", "darkorange"]
 
-title_str = "T-Gate injection on N-qubit, 40-layer Clifford Circuit"
+title_str = "T-Gate injection on N-qubit, 40-layer random Clifford Circuit"
 p = 40
 for i in range(len(files)):
     N = i + 3
@@ -82,29 +82,63 @@ for i in range(len(files)):
 
 #%%
 
+random.seed(1)
+
 p = 60
 N = 4
-N_gates = 6
+d = 2**N
+N_gates = 12
+N_repeats = 50
 
-entropies = []
+all_entropies = []
+all_stds = []
+max_magic = np.log(d + 1) - np.log(2)
 
-clifford_layers = gen_clifford_circuit(p, N)
-for g in range(N_gates):
-    insertion_point = random.randint(p//4, (3 * p) //4)
-    q_on = random.randint(0, N - 1)
-    clifford_layers[insertion_point] = clifford_layers[insertion_point] + [pqc.T(q_on, N)]
-    insert_circuit = pqc.PQC(N)
-    for l in clifford_layers:
-        insert_circuit.add_layer(l)
-    insert_circuit._quantum_state = qt.Qobj(insert_circuit.run())
-    i_c_m = Measurements(insert_circuit)
-    e = i_c_m.efficient_measurements(1, expr=False, ent=False, eom=True)
-    entropies.append(e['Magic'][0])
-
-print(entropies)
+for i in range(N_repeats):
+    print(f"Iteration {i}")
+    entropies = [0]
+    stds = [0]
+    clifford_layers = gen_clifford_circuit(p, N, method='fixed')
+    for g in range(N_gates):
+        insertion_point = random.randint(p//4, (3 * p) //4)
+        q_on = random.randint(0, N - 1)
+        clifford_layers[insertion_point] = clifford_layers[insertion_point] + [pqc.T(q_on, N)]
+        insert_circuit = pqc.PQC(N)
+        for l in clifford_layers:
+            insert_circuit.add_layer(l)
+        insert_circuit._quantum_state = qt.Qobj(insert_circuit.run())
+        i_c_m = Measurements(insert_circuit)
+        e = i_c_m.efficient_measurements(1, expr=False, ent=False, eom=True)
+        entropies.append(e['Magic'][0])
+        stds.append(e['Magic'][1])
+    all_entropies.append(entropies)
+    all_stds.append(stds)
 
 #%%
-P, N = 6, 6
+magics = np.mean(all_entropies, axis=0) / max_magic
+stds = np.std(all_entropies, axis=0) / max_magic
+stderrs = stds / np.sqrt(len(stds))
+n_t_gates = np.array(range(len(magics)))
+default_title = f"T-Gate injection on {N}-qubit, {p}-layer Clifford Circuit"
+
+haar_random_magic = np.log(3 + d) - np.log(4)
+normalised_haar = haar_random_magic / max_magic
+plt.hlines(normalised_haar, 0, n_t_gates[-1], lw=2, ls='dotted', label="Haar random magic", color='red')
+plt.errorbar(n_t_gates, magics, yerr=stderrs, lw=4, label="Clifford circuit magic")
+
+
+def f(theta, d):
+    return (7*d**2 - 3*d + d*(d+3)*np.cos(4*theta) - 8) / (8*(d**2 - 1))
+k_doped_linear_magic = 1 - ((3 + d)**(-1)) * (4 + (d - 1) * f(np.pi / 4, d) **n_t_gates)
+k_doped_reyni_maigc = -1 * np.log(1 - k_doped_linear_magic)
+k_doped_reyni_maigc_normalised = k_doped_reyni_maigc / max_magic
+
+plt.plot(n_t_gates, k_doped_reyni_maigc_normalised, label="Theoretical model", lw=4, ls='--')
+pretty_graph("Number of T gates", "Fractional magic", default_title, 20)
+plt.legend(fontsize=18)
+
+#%%
+P, N = 4, 4
 
 layers, theta_ref = NPQC_layers(P, N)
 train_NPQC = pqc.PQC(N)
@@ -112,11 +146,17 @@ for l in layers:
     train_NPQC.add_layer(l)
 
 train_NPQC_m = Measurements(train_NPQC)
-ener, magics = train_NPQC_m.train(method="QNG", magic=True, angles=theta_ref) #theta_ref
+ener, traj, magics = train_NPQC_m.train(method="gradient", magic=True, angles=theta_ref) #theta_ref
 #%% Really interesting results - when initialised with theta_ref, training always seems to take 1762 iterations and gives really nice gaussian
 #magics = np.load('data/magics_npqc_training_4l_4q.npy')
 max_magic = np.log((2**N) + 1) - np.log(2)
 magics = np.array(magics) / max_magic
 iterations = range(len(magics))
+plt.figure("NPC training magic")
 plt.plot(iterations, magics, lw=4)
 pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", "Magic during NPQC training initialised with reference param", 20)
+
+plt.figure("NPQC training trajectory")
+plt.plot(iterations, traj, lw=4)
+pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQC initialised with reference param", 20)
+
