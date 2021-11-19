@@ -10,6 +10,7 @@ import qutip as qt
 import numpy as np
 import random
 from measurement import Measurements
+from helper_functions import genFockOp
 
 LEN_CLIFF_STRING = 3
 
@@ -123,4 +124,12 @@ def gen_TFIM_layers(p, N):
         layer = first_half + second_half
         layers.append(layer)
     return layers
-        
+
+
+def TFIM_hamiltonian(N, g):
+    H = 0
+    for i in range(N):
+        i_plus = (i + 1) % N
+        H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N)
+    H = -1 * H
+    return H

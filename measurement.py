@@ -289,7 +289,7 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", fidelity=False, angles=[], trajectory=False, magic=False):
         quit_iterations = 100000
         count = 0
         diff = 1
@@ -302,7 +302,7 @@ class Measurements():
 
         self._QC._quantum_state = self._QC.run(angles=angles)
         psi = self._QC._quantum_state
-        prev_energy = self._QC.energy()
+        prev_energy = self._QC.cost()
         while diff > epsilon and count < quit_iterations:
             if count % 100 == 0:
                 print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
@@ -330,8 +330,11 @@ class Measurements():
                 magics.append(eom)
     
             self._QC._quantum_state = self._QC.run(angles=theta_update)
-            energy = self._QC.energy()
-            diff = np.abs(energy - prev_energy)
+            energy = self._QC.cost()
+            if fidelity is True:
+                diff = np.abs(energy)
+            else:
+                diff = np.abs(energy - prev_energy)
             count += 1
             prev_energy = energy
             traj.append(energy)

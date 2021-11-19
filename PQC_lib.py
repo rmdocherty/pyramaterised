@@ -392,7 +392,7 @@ class PQC():
     """A class to define an n qubit wide, n layer deep Parameterised Quantum
     Circuit."""
 
-    def __init__(self, n_qubits):
+    def __init__(self, n_qubits, cost="energy"):
         self._n_qubits = n_qubits
         self._n_layers = 0
         self._layers = []
@@ -400,6 +400,20 @@ class PQC():
             Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
             Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
             self.H = Z0 * Z1
+        self.initial_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        self._cost_fn = cost
+        self.set_cost_fn(cost)
+        self._quantum_state = self.initial_state
+
+    def set_cost_fn(self, cost, psi_ref=None):
+        if cost == "energy":
+            self.cost = self._energy
+        elif cost == "fidelity":
+            self.cost = self._fidelity
+            self._psi_ref = psi_ref
+
+    def set_initial_state(self, state):
+        self.initial_state = qt.tensor([state for i in range(self._n_qubits)])
 
     def add_layer(self, layer, n=1):
         """Add $n layers to PQC._layers"""
@@ -451,7 +465,7 @@ class PQC():
 
     def run(self, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
-        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        circuit_state = self.initial_state
         self.set_params(angles=angles)
         for g in self.gates:
             circuit_state = g * circuit_state
@@ -461,17 +475,22 @@ class PQC():
         """Get a Qobj of |psi> for measurements."""
         self._quantum_state = qt.Qobj(self.run())
         if energy_out is True:
-            e = self.energy()
+            e = self.cost()
             print(f"Energy of state is {e}")
         return self._quantum_state
 
-    def energy(self, psi=None):
+    def _energy(self, psi=None, psi_ref=None):
         """Get energy of |psi>, the initial quantum state"""
         if psi is None:
             energy = qt.expect(self.H, self._quantum_state)
         else:
             energy = qt.expect(self.H, psi)
         return energy
+    
+    def _fidelity(self):
+        #get fidelity w.r.t target state
+        fidelity = np.abs(self._quantum_state.overlap(self._psi_ref))**2 
+        return 1 - fidelity
 
     def take_derivative(self, g_on):
         """Get the derivative of the ith parameter of the circuit and return
@@ -486,7 +505,7 @@ class PQC():
         #set pth gate to be deriv * gate
         gates[p_loc] = deriv * gate
         #act the derivative of circuit on |0>
-        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        circuit_state = self.initial_state
         for g in gates:
             circuit_state = g * circuit_state
         #reset the gate back to what it was originally
