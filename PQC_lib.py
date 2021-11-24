@@ -64,13 +64,17 @@ class PRot(Gate):
         self._q_N = q_N
         self._theta = 0
         self._is_param = True
+
+        self._set_properties()
+        self._fock = genFockOp(self._pauli, self._q_on, self._q_N, 2)
         self._operation = self._set_op()
 
     def _set_op(self):
-        """Change this for different PRots to change their behaviour"""
-        self._gate = qt.qeye
-        self._pauli = qt.qeye(2)
-        return qt.qeye([self._q_N, self._q_N])
+        return self._gate(self._theta, N=self._q_N, target=self._q_on)
+    
+    def _set_properties(self):
+        self._gate = iden
+        self._pauli = iden
 
     def set_theta(self, theta):
         self._theta = theta
@@ -80,8 +84,7 @@ class PRot(Gate):
         """Take the derivative of the PRot - this generates the pauli gate
         associated with the gate type (i.e R_x -> sigma_x) operating on given
         qubit and multiplies it by j/2."""
-        focks = genFockOp(self._pauli, self._q_on, self._q_N, 2)
-        deriv = -1j * focks / 2
+        deriv = -1j * self._fock / 2
         return deriv
 
     def flip_pauli(self):
@@ -95,24 +98,21 @@ class PRot(Gate):
 
 
 class R_x(PRot):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.rx
         self._pauli = qt.sigmax()
-        return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class R_y(PRot):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.ry
         self._pauli = qt.sigmay()
-        return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 
 class R_z(PRot):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.rz
         self._pauli = qt.sigmaz()
-        return self._gate(self._theta, N=self._q_N, target=self._q_on)
 
 #%% Fixed angle single-qubit rotations
 
@@ -153,6 +153,7 @@ class fixed_R_y(R_y):
         self._q_N = q_N
         self._theta = theta
         self._is_param = False
+        self._set_properties()
         self._operation = self._set_op()
 
     def set_theta(self, theta):
@@ -297,7 +298,7 @@ class shared_parameter(PRot):
     def _set_op(self):
         operation = prod(self._layer[::-1])
         return operation
-    
+
     def flip_pauli(self):
         for g in self._layer:
             g.flip_pauli()
@@ -306,7 +307,7 @@ class shared_parameter(PRot):
         return f"Block of {self._layer}"
 
 
-#%% 2 qubit rotation gates
+#%% 2 qubit rotation gates⎜⎜
 
 #big question - should the second qubit angle be -1 * theta ???
 
@@ -317,20 +318,22 @@ class RR(PRot, EntGate):
         self._q_N = q_N
         self._theta = 0
         self._is_param = True
+        self._set_properties()
+        self._fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
+        self._fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
+        self._I = iden(self._q_N)
         self._operation = self._set_op()
 
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = iden
-        self._pauli = iden #are these derivatives right?
-        g1 = self._gate(N=self._q_N)
-        g2 = self._gate(N=self._q_N)
-        return g1 * g2
+        self._pauli = iden
+
+    def _set_op(self): #analytic expression for exponent of pauli is cos(x)*I + sin(x)*pauli_str
+        return np.cos(self._theta) * self._I + np.sin(self._theta) * self._fock1 * self._fock2
 
     def derivative(self):
         """Derivative of XX/YY/ZZ is -i * tensor(sigmai, sigmai) /2"""
-        fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
-        fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
-        deriv = -1j * (fock1 * fock2) / 2
+        deriv = -1j * (self._fock1 * self._fock2) / 2
         return deriv
 
     def __repr__(self):
@@ -340,35 +343,21 @@ class RR(PRot, EntGate):
 
 
 class R_zz(RR):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.rz
-        self._pauli = qt.sigmaz() #are these derivatives right?
-        #g1 = self._gate(self._theta, target=self._q1)
-        #g2 = self._gate(-1 * self._theta, target=self._q2)
-        fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
-        fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
-        preexp = -1j * 0.5 * self._theta * fock1 * fock2
-        to_expo = qt.Qobj(preexp)
-        op = to_expo.expm()
-        return op
+        self._pauli = qt.sigmaz()
 
 
 class R_xx(RR):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.rx
         self._pauli = qt.sigmax()
-        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
-        return g1 * g2
 
 
 class R_yy(RR):
-    def _set_op(self):
+    def _set_properties(self):
         self._gate = qt.qip.operations.ry
         self._pauli = qt.sigmay()
-        g1 = self._gate(self._theta, N=self._q_N, target=self._q1)
-        g2 = self._gate(-1 * self._theta, N=self._q_N, target=self._q2)
-        return g1 * g2
 
 
 class RR_block(shared_parameter):
@@ -408,16 +397,10 @@ class PQC():
             Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
             self.H = Z0 * Z1
         self.initial_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
-        self._cost_fn = cost
-        self.set_cost_fn(cost)
         self._quantum_state = self.initial_state
 
-    def set_cost_fn(self, cost, psi_ref=None):
-        if cost == "energy":
-            self.cost = self._energy
-        elif cost == "fidelity":
-            self.cost = self._fidelity
-            self._psi_ref = psi_ref
+    def set_H(self, H):
+        self.H = H
 
     def set_initial_state(self, state):
         self.initial_state = qt.tensor([state for i in range(self._n_qubits)])
@@ -486,19 +469,18 @@ class PQC():
             print(f"Energy of state is {e}")
         return self._quantum_state
 
-    def _energy(self, psi=None, psi_ref=None):
+    def cost(self, theta):
         """Get energy of |psi>, the initial quantum state"""
-        if psi is None:
-            energy = qt.expect(self.H, self._quantum_state)
-        else:
-            energy = qt.expect(self.H, psi)
+        self._quantum_state = self.run(angles=theta)
+        psi = self._quantum_state
+        energy = qt.expect(self.H, psi)
         return energy
-    
-    def _fidelity(self):
+
+    def _fidelity(self, target_state):
         #get fidelity w.r.t target state
-        fidelity = np.abs(self._quantum_state.overlap(self._psi_ref))**2 
-        return 1 - fidelity
-    
+        fidelity = np.abs(self._quantum_state.overlap(target_state))**2
+        return fidelity
+
     def flip_deriv(self):
         parameterised = [g for g in self.gates if g._is_param]
         for g in parameterised:

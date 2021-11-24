@@ -95,7 +95,7 @@ all_stds = []
 max_magic = np.log(d + 1) - np.log(2)
 
 #%%
-N_repeats = 250
+N_repeats = 50
 
 for i in range(N_repeats):
     print(f"Iteration {i}")
@@ -168,19 +168,19 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQ
 
 #%%
 N = 4
-p = 9
+p = 4
 qg_circuit = pqc.PQC(N)
 init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-layer1 = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+layer1 = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] 
 
 
 
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1, n=p)
 
-clifford_angles = ([np.pi/2 for i in range(N)] + [0 for i in range(N)]) * p
+#clifford_angles = ([0 for i in range(N)] + [0 for i in range(N)]) * p
 qg_circuit_m = Measurements(qg_circuit)
-out = qg_circuit_m.train(trajectory=True, magic=True, angles=clifford_angles)
+out = qg_circuit_m.train(trajectory=True, magic=True, angles=[], rate=0.0001)
 
 #%%
 plt.figure("magic")
@@ -191,7 +191,7 @@ iterations = range(len(magics))
 plt.plot(iterations, magics, lw=4, color="green")
 pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", f"Magic during {N} qubit {p} layer PQC training initialised with clifford angles", 20)
 
-traj = np.array(traj)
+traj = np.array(out[1])
 plt.figure("trajedy")
 plt.plot(iterations, out[1], color="orange", lw=4)
 pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer PQC training initialised with clifford angles", 20)

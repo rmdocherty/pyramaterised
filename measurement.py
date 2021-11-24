@@ -249,6 +249,7 @@ class Measurements():
         coeffs = []
         for state in F:
             c_i = psi.overlap(state)
+            #print(c_i)
             coeffs.append(c_i)
         GKP = 0
         mag = len(F)
@@ -264,7 +265,8 @@ class Measurements():
                     k_plus_j = tuple([(k[m] + j[m]) % 2 for m in range(len(k))])
                     k_plus_j_index = S.index(k_plus_j)
                     summand = coeffs[k_count] * coeffs[k_plus_j_index] * ((-1)**binary_product)/(2**N)
-                    GKP += np.abs(summand)
+                    GKP += summand
+                GKP = np.abs(GKP)
         GKP = np.log2(GKP)
         return GKP
 
@@ -337,7 +339,7 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", fidelity=False, angles=[], trajectory=False, magic=False):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False):
         quit_iterations = 100000
         count = 0
         diff = 1
@@ -346,43 +348,36 @@ class Measurements():
 
         if magic is True:
             P_n = self._gen_pauli_group()
-            
 
         self._QC._quantum_state = self._QC.run(angles=angles)
         psi = self._QC._quantum_state
-        prev_energy = self._QC.cost()
+        prev_energy = self._QC.cost(angles)
         while diff > epsilon and count < quit_iterations:
             if count % 100 == 0:
                 print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
-            
+
             if magic is True:
                 eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
                 magics.append(eom)
-            
+
             gradient_list = self._QC.get_gradients()
             gradients = []
             for i in gradient_list:
                 deriv = i
-                H_di_psi = self._QC.H * deriv #THIS IS NOT THE FIEDLITY!!! NEED TO CHANGE THIS SO 
-                #print(psi, H_di_psi)
+                H_di_psi = self._QC.H * deriv
                 d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
                 gradients.append(d_i_f_theta)
             theta = self._QC.get_params()
 
             if method == "gradient":
                 theta_update = list(np.array(theta) - rate * np.array(gradients))
-            elif method == "QNG":
+            elif method == "QNG": #some serious problems here, think we need renormalizaiton
                 QFI = self._get_QFI(grad_list=gradient_list)
                 inverse = np.linalg.pinv(QFI)
                 f_inv_grad_psi = inverse.dot(np.array(gradients))
                 theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
-
-            self._QC._quantum_state = self._QC.run(angles=theta_update)
-            energy = self._QC.cost()
-            if fidelity is True:
-                diff = np.abs(energy)
-            else:
-                diff = np.abs(energy - prev_energy)
+            energy = self._QC.cost(theta_update)
+            diff = np.abs(energy - prev_energy)
             count += 1
             prev_energy = energy
             traj.append(energy)

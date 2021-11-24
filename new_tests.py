@@ -46,12 +46,12 @@ print("Action of 2 Hadamards on |0> is |0> again")
 
 #%% =============================EXPR AND ENT TESTS=============================
 """Tests based on Expr baselines from Fig 1 arXiv:1905.10876v1"""
-idle_circuit = pqc.PQC(1)
-layer = [pqc.PRot(0, 1)]
-idle_circuit.add_layer(layer)
-idle_circuit_m = Measurements(idle_circuit)
-e = idle_circuit_m.efficient_measurements(100, expr=True, ent=False, eom=False) #N=100 -> 4950 state pairs
-print(f"Idle circuit expr is {e['Expr']}, should be around 4.317")
+# idle_circuit = pqc.PQC(1)
+# layer = [pqc.PRot(0, 1)]
+# idle_circuit.add_layer(layer)
+# idle_circuit_m = Measurements(idle_circuit)
+# e = idle_circuit_m.efficient_measurements(100, expr=True, ent=False, eom=False) #N=100 -> 4950 state pairs
+# print(f"Idle circuit expr is {e['Expr']}, should be around 4.317")
 
 #%%
 circuit_A = pqc.PQC(1)
@@ -147,10 +147,10 @@ layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
-qg_circuit.add_layer(layer3, n=20)
+qg_circuit.add_layer(layer3, n=1)
 
 qg_circuit.gen_quantum_state()
-default_angles = angles=[
+default_angles = [
         3.21587011, 5.97193953, 0.90578156, 5.96054027,
         1.9592948 , 2.65983852, 5.20060878, 2.571074,
         3.45319898, 0.17315902, 4.73446249, 3.38125416]
@@ -163,7 +163,7 @@ default_angles = angles=[
 qg_circuit._quantum_state = qt.Qobj(qg_circuit.run())
 print(qg_circuit)
 
-energy = qg_circuit.energy()
+energy = qg_circuit.cost(default_angles)
 
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
@@ -192,6 +192,13 @@ class Bell:
     def gen_quantum_state(self):
         return qt.states.bell_state('11')
 
+class One:
+    def __init__(self):
+        self._n_qubits = 1
+        self._quantum_state = qt.basis(1, 1)
+
+    def gen_quantum_state(self):
+        return qt.basis(1, 1)
 
 bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
@@ -330,7 +337,7 @@ random_state = qt.random_objects.rand_ket(N=2**N)
 NPQC.set_cost_fn("fidelity", random_state)
 NPQC_m = Measurements(NPQC)
 #%%
-out = NPQC_m.train(fidelity=True, rate=0.01, epsilon=1e-3)
+out = NPQC_m.train(rate=0.01, epsilon=1e-3)
 
 
 #%%
@@ -366,30 +373,29 @@ Test TFIM overparameterisation values for different N.
 """
 
 N, p = 4, N // 2
+g = 0
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
 plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
 TFIM.set_initial_state(plus_state)
 
-hamiltonian = TFIM_hamiltonian(N, g=1)
-ground_state = hamiltonian.groundstate()[1]
-print(ground_state)
-TFIM.set_cost_fn("fidelity", ground_state)
+hamiltonian = TFIM_hamiltonian(N, g=g)
+groundstate = hamiltonian.groundstate()[1]
+TFIM.set_H(hamiltonian)
 
 TFIM_layers = gen_TFIM_layers(p, N)
 for l in TFIM_layers:
     TFIM.add_layer(l)
 
-TFIM.flip_deriv()
-#%%
-print(TFIM)
-op = find_overparam_point(TFIM, [1])
-print(f"{N} qubit TFIM overparameterised after {op + 1} layers")
-
+#TFIM.flip_deriv()
+print(groundstate)
 #%%
 
 TFIM_m = Measurements(TFIM)
-out = TFIM_m.train(method='QNG', fidelity=True, rate=0.01, epsilon=1e-3) #angles=[np.pi for i in range(2*p)]
-
+out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-7) #angles=[np.pi for i in range(2*p)]
 #%%
+overlap = TFIM._fidelity(groundstate)
+print(f"Fidelity of TFIM circuit state after training with groundstate is {overlap} for g={g}")
+print(groundstate)
+print(TFIM._quantum_state)
