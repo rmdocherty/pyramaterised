@@ -84,6 +84,9 @@ class PRot(Gate):
         deriv = -1j * focks / 2
         return deriv
 
+    def flip_pauli(self):
+        self._pauli = -1 * self._pauli
+
     def __repr__(self):
         name = type(self).__name__
         angle = self._theta
@@ -294,6 +297,10 @@ class shared_parameter(PRot):
     def _set_op(self):
         operation = prod(self._layer[::-1])
         return operation
+    
+    def flip_pauli(self):
+        for g in self._layer:
+            g.flip_pauli()
 
     def __repr__(self):
         return f"Block of {self._layer}"
@@ -491,6 +498,11 @@ class PQC():
         #get fidelity w.r.t target state
         fidelity = np.abs(self._quantum_state.overlap(self._psi_ref))**2 
         return 1 - fidelity
+    
+    def flip_deriv(self):
+        parameterised = [g for g in self.gates if g._is_param]
+        for g in parameterised:
+            g.flip_pauli()
 
     def take_derivative(self, g_on):
         """Get the derivative of the ith parameter of the circuit and return

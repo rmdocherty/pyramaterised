@@ -219,6 +219,54 @@ class Measurements():
         if magic > np.log(d + 1) - np.log(2):
             raise Exception("Magic max exceeded!")
         return magic
+    
+    def _gen_F_n_2(self):
+        N = self._QC._n_qubits
+        strings = list(product([0,1], repeat=N))
+        dims = [2 for i in range(2**N)]
+        states = [qt.state_number_qobj(dims, list(s)) for s in strings]
+        #print(
+        return states, strings
+
+    def _get_coeffs(self, psi=None, F=[]):
+        if F == []:
+            F, S = self._gen_F_n_2()
+        if psi is None:
+            psi = self._QC._quantum_state
+        coeffs = []
+        print(F)
+        for state in F:
+            c_i = state.overlap(psi)
+            coeffs.append(c_i)
+        return coeffs
+
+    def GKP_magic(self, psi=None, F=[]):
+        if F == []:
+            F, S = self._gen_F_n_2()
+        N = self._QC._n_qubits
+        if psi is None:
+            psi = self._QC._quantum_state
+        coeffs = []
+        for state in F:
+            c_i = psi.overlap(state)
+            coeffs.append(c_i)
+        GKP = 0
+        mag = len(F)
+        #print(S)
+        for i_count in range(mag):
+            for j_count in range(mag):
+                for k_count in range(mag):
+                    i = S[i_count]
+                    j = S[j_count]
+                    k = S[k_count]
+                    inner_prod = [i[n] * k[n] for n in range(len(i))]
+                    binary_product = sum(inner_prod) % 2
+                    k_plus_j = tuple([(k[m] + j[m]) % 2 for m in range(len(k))])
+                    k_plus_j_index = S.index(k_plus_j)
+                    summand = coeffs[k_count] * coeffs[k_plus_j_index] * ((-1)**binary_product)/(2**N)
+                    GKP += np.abs(summand)
+        GKP = np.log2(GKP)
+        return GKP
 
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True):
         n = self._QC._n_qubits
@@ -306,12 +354,16 @@ class Measurements():
         while diff > epsilon and count < quit_iterations:
             if count % 100 == 0:
                 print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
-
+            
+            if magic is True:
+                eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+                magics.append(eom)
+            
             gradient_list = self._QC.get_gradients()
             gradients = []
             for i in gradient_list:
                 deriv = i
-                H_di_psi = self._QC.H * deriv
+                H_di_psi = self._QC.H * deriv #THIS IS NOT THE FIEDLITY!!! NEED TO CHANGE THIS SO 
                 #print(psi, H_di_psi)
                 d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
                 gradients.append(d_i_f_theta)
@@ -324,11 +376,7 @@ class Measurements():
                 inverse = np.linalg.pinv(QFI)
                 f_inv_grad_psi = inverse.dot(np.array(gradients))
                 theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
-    
-            if magic is True:
-                eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
-                magics.append(eom)
-    
+
             self._QC._quantum_state = self._QC.run(angles=theta_update)
             energy = self._QC.cost()
             if fidelity is True:

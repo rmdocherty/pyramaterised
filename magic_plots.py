@@ -84,15 +84,18 @@ for i in range(len(files)):
 
 random.seed(1)
 
-p = 60
+p = 150
 N = 4
 d = 2**N
-N_gates = 12
-N_repeats = 50
+N_gates = 50
+N_repeats = 100
 
 all_entropies = []
 all_stds = []
 max_magic = np.log(d + 1) - np.log(2)
+
+#%%
+N_repeats = 250
 
 for i in range(N_repeats):
     print(f"Iteration {i}")
@@ -115,16 +118,18 @@ for i in range(N_repeats):
     all_stds.append(stds)
 
 #%%
+
 magics = np.mean(all_entropies, axis=0) / max_magic
 stds = np.std(all_entropies, axis=0) / max_magic
 stderrs = stds / np.sqrt(len(stds))
 n_t_gates = np.array(range(len(magics)))
 default_title = f"T-Gate injection on {N}-qubit, {p}-layer Clifford Circuit"
+plt.figure(default_title.strip(","))
 
 haar_random_magic = np.log(3 + d) - np.log(4)
 normalised_haar = haar_random_magic / max_magic
 plt.hlines(normalised_haar, 0, n_t_gates[-1], lw=2, ls='dotted', label="Haar random magic", color='red')
-plt.errorbar(n_t_gates, magics, yerr=stderrs, lw=4, label="Clifford circuit magic")
+plt.errorbar(n_t_gates, magics, yerr=stderrs, lw=4, label=f"Clifford circuit magic, {len(all_entropies)} repeats")
 
 
 def f(theta, d):
@@ -159,4 +164,35 @@ pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", "Magic d
 plt.figure("NPQC training trajectory")
 plt.plot(iterations, traj, lw=4)
 pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQC initialised with reference param", 20)
+
+
+#%%
+N = 4
+p = 9
+qg_circuit = pqc.PQC(N)
+init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+layer1 = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+
+
+
+qg_circuit.add_layer(init_layer)
+qg_circuit.add_layer(layer1, n=p)
+
+clifford_angles = ([np.pi/2 for i in range(N)] + [0 for i in range(N)]) * p
+qg_circuit_m = Measurements(qg_circuit)
+out = qg_circuit_m.train(trajectory=True, magic=True, angles=clifford_angles)
+
+#%%
+plt.figure("magic")
+N = 4
+max_magic = np.log((2**N) + 1) - np.log(2)
+magics = np.array(out[2]) / max_magic
+iterations = range(len(magics))
+plt.plot(iterations, magics, lw=4, color="green")
+pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", f"Magic during {N} qubit {p} layer PQC training initialised with clifford angles", 20)
+
+traj = np.array(traj)
+plt.figure("trajedy")
+plt.plot(iterations, out[1], color="orange", lw=4)
+pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer PQC training initialised with clifford angles", 20)
 

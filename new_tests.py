@@ -195,7 +195,9 @@ class Bell:
 
 bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
+g = bell_m.GKP_magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
+print(f"GKP Magic is {g}, should be 0 for stabiliser state")
 
 
 """
@@ -209,6 +211,7 @@ max_N = 6
 max_P = 12
 
 entropies = []
+GKPs = []
 for n in range(2, max_N):
     for p in range(1, max_P):
         layers = gen_clifford_circuit(p, n)
@@ -219,6 +222,8 @@ for n in range(2, max_N):
         c_c_m = Measurements(clifford_circuit)
         e = c_c_m.entropy_of_magic()
         entropies.append(e)
+        gkp = c_c_m.GKP_magic()
+        GKPs.append(gkp)
 
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
 
@@ -314,6 +319,19 @@ for N in range(4, 10, 2): #step=2 for even N
         masked = np.where(QFI < 10**-12, 0, QFI)
         check_iden(masked)
         print("\n")
+#%%
+N = 4
+P = 4
+layers, theta_ref = NPQC_layers(P, N)
+NPQC = pqc.PQC(N)
+for l in layers:
+    NPQC.add_layer(l)
+random_state = qt.random_objects.rand_ket(N=2**N)
+NPQC.set_cost_fn("fidelity", random_state)
+NPQC_m = Measurements(NPQC)
+#%%
+out = NPQC_m.train(fidelity=True, rate=0.01, epsilon=1e-3)
+
 
 #%%
 
@@ -347,22 +365,23 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 4, 6
+N, p = 4, N // 2
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
 plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
 TFIM.set_initial_state(plus_state)
 
-hamiltonian = TFIM_hamiltonian(N, g=0.5)
+hamiltonian = TFIM_hamiltonian(N, g=1)
 ground_state = hamiltonian.groundstate()[1]
 print(ground_state)
 TFIM.set_cost_fn("fidelity", ground_state)
 
-TFIM_layers = gen_TFIM_layers(p, 4)
+TFIM_layers = gen_TFIM_layers(p, N)
 for l in TFIM_layers:
     TFIM.add_layer(l)
-    
+
+TFIM.flip_deriv()
 #%%
 print(TFIM)
 op = find_overparam_point(TFIM, [1])
@@ -371,4 +390,6 @@ print(f"{N} qubit TFIM overparameterised after {op + 1} layers")
 #%%
 
 TFIM_m = Measurements(TFIM)
-out = TFIM_m.train(method='QNG', fidelity=True, rate=0.01, angles=[np.pi/2 for i in range(2*p)])
+out = TFIM_m.train(method='QNG', fidelity=True, rate=0.01, epsilon=1e-3) #angles=[np.pi for i in range(2*p)]
+
+#%%
