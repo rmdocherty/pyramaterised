@@ -9,6 +9,7 @@ Some basic functions lifted from Tobias' github. May be able to replace with
 some numpy functions.
 """
 import qutip as qt
+import numpy as np
 from functools import partial, reduce
 import operator
 import matplotlib.pyplot as plt
@@ -53,3 +54,16 @@ def pretty_graph(x_label, y_label, title, fontsize):  #formatting graphs
     plt.ylabel(y_label, fontsize=fontsize)
     plt.tick_params(labelsize=fontsize)
     plt.gca().set_facecolor("#fffcf5")
+
+def extend(nested_list):
+    sizes = []
+    for l in nested_list:
+        sizes.append(len(l))
+    pad_to_length = max(sizes)
+    for l in nested_list:
+        pad_with = l[-1]
+        while len(l) < pad_to_length:
+            l.append(pad_with)
+    return np.array(nested_list)
+        
+

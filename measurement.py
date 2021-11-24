@@ -11,6 +11,8 @@ import scipy
 import matplotlib.pyplot as plt
 from itertools import product, combinations
 from helper_functions import pretty_subplot
+import random
+
 
 
 class Measurements():
@@ -346,40 +348,56 @@ class Measurements():
         traj = []
         magics = []
 
-        if magic is True:
-            P_n = self._gen_pauli_group()
+        if angles == []:
+            #random.seed(1)
+            n_params = len(self._QC._parameterised)
+            angles = [random.random() * 2 * np.pi for i in range(n_params)]
 
-        self._QC._quantum_state = self._QC.run(angles=angles)
-        psi = self._QC._quantum_state
-        prev_energy = self._QC.cost(angles)
-        while diff > epsilon and count < quit_iterations:
-            if count % 100 == 0:
-                print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
-
-            if magic is True:
-                eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
-                magics.append(eom)
-
-            gradient_list = self._QC.get_gradients()
-            gradients = []
-            for i in gradient_list:
-                deriv = i
-                H_di_psi = self._QC.H * deriv
-                d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
-                gradients.append(d_i_f_theta)
-            theta = self._QC.get_params()
-
-            if method == "gradient":
-                theta_update = list(np.array(theta) - rate * np.array(gradients))
-            elif method == "QNG": #some serious problems here, think we need renormalizaiton
-                QFI = self._get_QFI(grad_list=gradient_list)
-                inverse = np.linalg.pinv(QFI)
-                f_inv_grad_psi = inverse.dot(np.array(gradients))
-                theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
-            energy = self._QC.cost(theta_update)
-            diff = np.abs(energy - prev_energy)
-            count += 1
-            prev_energy = energy
-            traj.append(energy)
-        print(f"Finished after {count} iterations with cost function = {energy}")
+        P_n = self._gen_pauli_group()
+            
+        def trajmaj(Xi):
+            eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+            magics.append(eom)
+            trajectory = self._QC.cost(Xi)
+            traj.append(trajectory)
+            
+            
+        if method.lower() in ["gradient", "QNG"]:
+            self._QC._quantum_state = self._QC.run(angles=angles)
+            psi = self._QC._quantum_state
+            prev_energy = self._QC.cost(angles)
+            while diff > epsilon and count < quit_iterations:
+                if count % 100 == 0:
+                    print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
+    
+                if magic is True:
+                    eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+                    magics.append(eom)
+    
+                gradient_list = self._QC.get_gradients()
+                gradients = []
+                for i in gradient_list:
+                    deriv = i
+                    H_di_psi = self._QC.H * deriv
+                    d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
+                    gradients.append(d_i_f_theta)
+                theta = self._QC.get_params()
+    
+                if method == "gradient":
+                    theta_update = list(np.array(theta) - rate * np.array(gradients))
+                elif method == "QNG": #some serious problems here, think we need renormalizaiton
+                    QFI = self._get_QFI(grad_list=gradient_list)
+                    inverse = np.linalg.pinv(QFI)
+                    f_inv_grad_psi = inverse.dot(np.array(gradients))
+                    theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
+                energy = self._QC.cost(theta_update)
+                diff = np.abs(energy - prev_energy)
+                count += 1
+                prev_energy = energy
+                traj.append(energy)
+            print(f"Finished after {count} iterations with cost function = {energy}")
+        else:
+            op_out = scipy.optimize.minimize(self._QC.cost, x0=angles, method=method, callback=trajmaj)
+            energy = op_out.fun
         return [energy, traj, magics]
+

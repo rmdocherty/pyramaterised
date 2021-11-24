@@ -11,6 +11,7 @@ import qutip as qt
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import scipy
 
 from measurement import Measurements
 from math import isclose
@@ -179,7 +180,8 @@ print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%% 
 """Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
  to 1e-6 accuracy and cost function is 0.34583907096349875"""
-qg_m.train(rate=0.001, method="QNG", angles=[])
+out = qg_m.train(rate=0.001, method="BFGS", angles=[])
+print(out)
 """Lowest we've recorded is -0.69589... but there is massive variance"""
 #%% =============================ENTROPY OF MAGIC TESTS=============================
 
@@ -333,8 +335,7 @@ layers, theta_ref = NPQC_layers(P, N)
 NPQC = pqc.PQC(N)
 for l in layers:
     NPQC.add_layer(l)
-random_state = qt.random_objects.rand_ket(N=2**N)
-NPQC.set_cost_fn("fidelity", random_state)
+
 NPQC_m = Measurements(NPQC)
 #%%
 out = NPQC_m.train(rate=0.01, epsilon=1e-3)
@@ -372,8 +373,8 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 4, N // 2
-g = 0
+N, p = 4, 4
+g = 0.5
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
@@ -389,13 +390,34 @@ for l in TFIM_layers:
     TFIM.add_layer(l)
 
 #TFIM.flip_deriv()
-print(groundstate)
 #%%
+random.seed(2)
+random_angles = [random.random()*2*np.pi for i in range(2*p)]
+clifford_angles = [0 for i in range(2*p)]
 
 TFIM_m = Measurements(TFIM)
-out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-7) #angles=[np.pi for i in range(2*p)]
+out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles)
+BFGS_min = out[0]
+
+out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
+grad_min = out[0]
+print(f"BFGS (scipy minimizer) TFIM min = {BFGS_min}, gradient min = {grad_min}")
 #%%
 overlap = TFIM._fidelity(groundstate)
 print(f"Fidelity of TFIM circuit state after training with groundstate is {overlap} for g={g}")
-print(groundstate)
-print(TFIM._quantum_state)
+#%%
+plt.figure("magic")
+N = 4
+max_magic = np.log((2**N) + 1) - np.log(2)
+magics = np.array(out[2]) / max_magic
+iterations = range(len(magics))
+plt.plot(iterations, magics, lw=4, color="green")
+pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", f"Magic during {N} qubit {p} layer TFIM training initialised with random angles", 20)
+
+traj = np.array(out[1])
+plt.figure("trajedy")
+plt.plot(iterations, out[1], color="orange", lw=4, label="Gradient descent")
+plt.hlines(BFGS_min, 0, iterations[-1], lw=2, ls='dotted', label="BFGS min", color='red')
+pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer TFIM training initialised with random angles", 20)
+
+plt.legend(fontsize=18)
