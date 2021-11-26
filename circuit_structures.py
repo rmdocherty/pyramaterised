@@ -126,7 +126,7 @@ def gen_TFIM_layers(p, N):
     return layers
 
 
-def TFIM_hamiltonian(N, g):
+def TFIM_hamiltonian(N, g, h=0):
     H = 0
     for i in range(N):
         i_plus = (i + 1) % N

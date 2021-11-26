@@ -360,8 +360,10 @@ class Measurements():
             magics.append(eom)
             trajectory = self._QC.cost(Xi)
             traj.append(trajectory)
-            
-            
+        
+        self._QC._quantum_state = self._QC.run(angles=angles)
+        trajmaj(angles)
+
         if method.lower() in ["gradient", "QNG"]:
             self._QC._quantum_state = self._QC.run(angles=angles)
             psi = self._QC._quantum_state
@@ -397,7 +399,7 @@ class Measurements():
                 traj.append(energy)
             print(f"Finished after {count} iterations with cost function = {energy}")
         else:
-            op_out = scipy.optimize.minimize(self._QC.cost, x0=angles, method=method, callback=trajmaj)
+            op_out = scipy.optimize.minimize(self._QC.cost, x0=angles, method=method, callback=trajmaj, tol=epsilon)
             energy = op_out.fun
         return [energy, traj, magics]
 

@@ -286,7 +286,7 @@ class shared_parameter(PRot):
         deriv = 0
         for g in self._layer:
             single_deriv = g.derivative()
-            deriv = deriv + single_deriv
+            deriv = deriv * single_deriv #multiply or plus?
         return deriv
 
     def set_theta(self, theta):
@@ -329,7 +329,7 @@ class RR(PRot, EntGate):
         self._pauli = iden
 
     def _set_op(self): #analytic expression for exponent of pauli is cos(x)*I + sin(x)*pauli_str
-        return np.cos(self._theta) * self._I + np.sin(self._theta) * self._fock1 * self._fock2
+        return np.cos(self._theta / 2) * self._I - 1j * np.sin(self._theta / 2) * self._fock1 * self._fock2
 
     def derivative(self):
         """Derivative of XX/YY/ZZ is -i * tensor(sigmai, sigmai) /2"""
@@ -388,7 +388,7 @@ class PQC():
     """A class to define an n qubit wide, n layer deep Parameterised Quantum
     Circuit."""
 
-    def __init__(self, n_qubits, cost="energy"):
+    def __init__(self, n_qubits):
         self._n_qubits = n_qubits
         self._n_layers = 0
         self._layers = []

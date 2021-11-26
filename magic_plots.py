@@ -167,26 +167,42 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQ
 
 
 #%%
-N = 4
-p = 4
+random.seed(1000)
+N = 2
+p = 5
+trainer = "gradient"
 
 init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-layer1 = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] 
+layer1 =  [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] #+ [pqc.CHAIN(pqc.CNOT, N)]  #[pqc.R_y(i, N) for i in range(N)] +
 
 
 all_entropies = []
 all_trajectories = []
+all_states = []
 
 #%%
-for i in range(20):
+for i in range(1):
     print(i)
     qg_circuit = pqc.PQC(N)
     qg_circuit.add_layer(layer1, n=p)
     qg_circuit_m = Measurements(qg_circuit)
-    random_angles = [random.random()*2*np.pi for i in range(2*4*p)]
-    out = qg_circuit_m.train(method="BFGS", trajectory=True, magic=True, angles=random_angles, rate=0.001)
+    random_angles = [random.random()*2*np.pi for i in range(2*4*p)] #should this be haar random?
+    out = qg_circuit_m.train(method=trainer, trajectory=True, magic=True, angles=random_angles, rate=0.001, epsilon=1e-6)
     all_entropies.append(out[2])
     all_trajectories.append(out[1])
+
+#%%
+count = 0
+for state_list in all_states:
+    print(f"Initilization {count}")
+    for state in state_list:
+        if state == state_list[-1]:
+            print(state)
+            print(state.ptrace(0))
+            print(state.ptrace(1))
+            print(qt.expect(qg_circuit.H, state))
+            print("\n")
+    count += 1
 
 #%%
 magics = extend(all_entropies)
@@ -194,16 +210,39 @@ trajectories = extend(all_trajectories)
 
 n_avg = len(magics)
 
-N = 4
+N = 3
 max_magic = np.log((2**N) + 1) - np.log(2)
+
+title=f"Magic during {N} qubit {p} layer Hardware Efficient PQC"
+plt.figure(title + "_"+ trainer)
+for m in magics:
+    iterations = range(len(m))
+    magic = np.array(m) / max_magic
+    if m.all() == magics[-1].all():
+        plt.plot(iterations, magic, lw=4, color="green", label=trainer)
+    else:
+        plt.plot(iterations, magic, lw=4, color="green")
+pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", title, 20)
+#plt.legend(fontsize=18)
+
+plt.figure("Trajectories")
+for t in trajectories:
+    iterations = range(len(t))
+    if t.all() == trajectories[-1].all():
+        plt.plot(iterations, t, lw=4, color="orange", label=trainer)
+    else:
+        plt.plot(iterations, t, lw=4, color="orange")
+pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer Hardware Efficient PQC", 20)
+plt.legend(fontsize=18)
+
 
 plt.figure("Average magic")
 avg_magic = np.mean(magics, axis=0) / max_magic
 iterations = range(len(avg_magic))
 std_magic = np.std(magics, axis=0) / max_magic
 stderr_magic = std_magic / np.sqrt(n_avg)
-plt.errorbar(iterations, avg_magic, yerr=stderr_magic, color='lightgreen', lw=3, marker="", alpha=0.5, label=f"Standard error")
-plt.plot(iterations, avg_magic, lw=4, color="green", label=f"Average over {n_avg} repeats")
+plt.errorbar(iterations, avg_magic, yerr=stderr_magic, color='lightgreen', lw=3, marker="", alpha=0.5, label=f"Standard error over {n_avg} repeats")
+plt.plot(iterations, avg_magic, lw=4, color="green", label=trainer)
 pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", f"Average Magic during {N} qubit {p} layer Hardware Efficient PQC", 20)
 plt.legend(fontsize=18)
 
@@ -212,8 +251,8 @@ avg_traj = np.mean(trajectories, axis=0)
 iterations = range(len(avg_traj))
 std_traj = np.std(trajectories, axis=0)
 std_err_traj = std_traj / np.sqrt(n_avg)
-plt.errorbar(iterations, avg_traj, yerr=std_err_traj, color='wheat', lw=3, marker="", alpha=0.5, label=f"Standard error")
-plt.plot(iterations, avg_traj, color="orange", lw=4, label=f"Average over {n_avg} repeats")
+plt.errorbar(iterations, avg_traj, yerr=std_err_traj, color='wheat', lw=3, marker="", alpha=0.5, label=f"Standard error over {n_avg} repeats")
+plt.plot(iterations, avg_traj, color="orange", lw=4, label=trainer)
 pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer Hardware Efficient PQC", 20)
 
 plt.legend(fontsize=18)
@@ -232,10 +271,11 @@ all_trajectories = []
 
 #%%
 for i in range(100):
+    print(i)
     TFIM = pqc.PQC(N)
     #need to use |+> as initial state for TFIM model
     plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
-    TFIM.set_initial_state(plus_state)
+    #TFIM.set_initial_state(plus_state)
     
     hamiltonian = TFIM_hamiltonian(N, g=g)
     groundstate = hamiltonian.groundstate()[1]
@@ -248,13 +288,13 @@ for i in range(100):
     random_angles = [random.random()*2*np.pi for i in range(2*p)]
     
     TFIM_m = Measurements(TFIM)
-    out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
+    out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
     all_entropies.append(out[2])
     all_trajectories.append(out[1])
 
 #%%
 plt.figure("raw magic of TFIM")
-N = 4
+N = N
 max_magic = np.log((2**N) + 1) - np.log(2)
 for m in all_entropies:
     iterations = range(len(m))
@@ -269,6 +309,7 @@ n_avg = len(padded_magics)
 
 avg_magic = np.mean(padded_magics, axis=0) / max_magic
 std_magic = np.std(padded_magics, axis=0) / max_magic
+iterations = range(len(avg_magic))
 stderr_magic = std_magic / np.sqrt(n_avg)
 plt.errorbar(iterations, avg_magic, yerr=stderr_magic, color='lightgreen', lw=3, marker="", alpha=0.5, label=f"Standard error")
 plt.plot(iterations, avg_magic, lw=4, color="green", label=f"Average over {n_avg} repeats")
@@ -283,8 +324,38 @@ std_traj = np.std(padded_traj, axis=0)
 std_err_traj = std_traj / np.sqrt(n_avg)
 plt.errorbar(iterations, avg_traj, yerr=std_err_traj, color='wheat', lw=3, marker="", alpha=0.5, label=f"Standard error")
 plt.plot(iterations, avg_traj, color="orange", lw=4, label=f"Average over {n_avg} repeats")
-plt.hlines(BFGS_min, 0, iterations[-1], lw=2, ls='dotted', label="BFGS min", color='red')
+#plt.hlines(BFGS_min, 0, iterations[-1], lw=2, ls='dotted', label="BFGS min", color='red')
 pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer TFIM training initialised with random angles", 20)
 
 plt.legend(fontsize=18)
 
+#%%
+start = "data/"
+string = "_2q_5l_HE_"
+end = ".npy"
+
+magic_grad = np.load(start+"magic"+string+"grad"+end)
+traj_grad = np.load(start+"cost"+string+"gradient"+end)
+
+magic_bfgs = np.load(start+"magic"+string+"bfgs"+end)
+traj_bfgs = np.load(start+"cost"+string+"bfgs"+end)
+
+converge = False
+for i in range(1, len(traj_grad)):
+    if np.abs(traj_grad[i] - traj_grad[i-1]) <= 1e-6 and converge is False:
+        print(i)
+        grad_conv = i - 1
+        converge=True
+
+converge = False
+for i in range(1, len(traj_bfgs)):
+    if np.abs(traj_bfgs[i] - traj_bfgs[i-1]) <= 1e-6 and converge is False:
+        print(i)
+        bfgs_conv = i -1 
+        converge=True
+#%%
+scale_factor = grad_conv / 8
+iter_grad = range(len(magic_grad))
+iter_bfgs = np.array(range(len(magic_bfgs)))
+plt.plot(iter_grad, magic_grad)
+plt.plot(iter_bfgs * scale_factor, magic_bfgs)

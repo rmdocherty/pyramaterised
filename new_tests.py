@@ -373,38 +373,48 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 4, 4
-g = 0.5
+N, p = 4, 2
+g_0 = 1
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
 plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
-TFIM.set_initial_state(plus_state)
+final_state = qt.tensor([plus_state for i in range(N)])
+#TFIM.set_initial_state(plus_state)
 
-hamiltonian = TFIM_hamiltonian(N, g=g)
-groundstate = hamiltonian.groundstate()[1]
+hamiltonian = TFIM_hamiltonian(N, g=g_0)
+groundstate_energy, groundstate = hamiltonian.groundstate()
+print(groundstate_energy, groundstate)
 TFIM.set_H(hamiltonian)
 
 TFIM_layers = gen_TFIM_layers(p, N)
 for l in TFIM_layers:
     TFIM.add_layer(l)
 
+
 #TFIM.flip_deriv()
 #%%
-random.seed(2)
-random_angles = [random.random()*2*np.pi for i in range(2*p)]
+#random.seed(2)
+random_angles = [random.random()*np.pi for i in range(2*p)]
 clifford_angles = [0 for i in range(2*p)]
 
 TFIM_m = Measurements(TFIM)
-out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles)
-BFGS_min = out[0]
+#out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles)
+#BFGS_min = out[0]
+#print(TFIM.get_params())
 
 out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
+print(TFIM)
 grad_min = out[0]
-print(f"BFGS (scipy minimizer) TFIM min = {BFGS_min}, gradient min = {grad_min}")
+#print(f"BFGS (scipy minimizer) TFIM min = {BFGS_min}, gradient min = {grad_min}")
+print(grad_min)
+#print(TFIM.get_params())
 #%%
-overlap = TFIM._fidelity(groundstate)
-print(f"Fidelity of TFIM circuit state after training with groundstate is {overlap} for g={g}")
+overlap = TFIM_m._QC._fidelity(groundstate)
+print(f"Fidelity of TFIM circuit state after training with groundstate is {overlap} for g={g_0}")
+print(TFIM._quantum_state)
+analytic_overlap = TFIM._fidelity(final_state)
+print(analytic_overlap)
 #%%
 plt.figure("magic")
 N = 4
@@ -421,3 +431,46 @@ plt.hlines(BFGS_min, 0, iterations[-1], lw=2, ls='dotted', label="BFGS min", col
 pretty_graph("Iterations", "Cost function", f"Cost function vs iterations for {N} qubit {p} layer TFIM training initialised with random angles", 20)
 
 plt.legend(fontsize=18)
+
+#%%
+
+class Random_superpos():
+    def __init__(self):
+        self._n_qubits = 2
+        a_sq = random.random()
+        b_sq = 1 - a_sq
+        phase = np.exp(-1j*2*np.pi*random.random())
+        state_1 = phase * np.sqrt(a_sq) * qt.state_number_qobj([2,2], [0,1])
+        state_2 = np.sqrt(b_sq) * qt.state_number_qobj([2,2], [1,0])
+        self._quantum_state = state_1 + state_2
+
+    def gen_quantum_state(self):
+        return self._quantum_state
+
+magics = []
+for i in range(10000):
+    superpos = Random_superpos()
+    superpos_m = Measurements(superpos)
+    eom = superpos_m.entropy_of_magic()
+    magics.append(eom)
+
+#%%
+max_magic = np.log((2**2) + 1) - np.log(2)
+np_m = np.array(magics) / max_magic
+print(f"Mean is {np.mean(np_m)} +/- {np.std(np_m)}, max is {max(np_m)}, min is {min(np_m)}")
+#%%
+N = 4
+
+plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
+plus_state_N = qt.tensor([plus_state for i in range(N)])
+
+
+layer = [pqc.H(i, N) for i in range(N)]
+test_H = pqc.PQC(N)
+#test_H.set_initial_state(plus_state)
+test_H.add_layer(layer)
+test_H._quantum_state = test_H.run()
+
+
+analytic_overlap = test_H._fidelity(plus_state_N)
+print(analytic_overlap)
