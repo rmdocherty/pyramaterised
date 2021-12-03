@@ -286,7 +286,7 @@ class shared_parameter(PRot):
         deriv = 0
         for g in self._layer:
             single_deriv = g.derivative()
-            deriv = deriv * single_deriv #multiply or plus?
+            deriv = deriv + single_deriv #multiply or plus?
         return deriv
 
     def set_theta(self, theta):
@@ -312,21 +312,21 @@ class shared_parameter(PRot):
 #big question - should the second qubit angle be -1 * theta ???
 
 
-class RR(PRot, EntGate):
+class RR(PRot):
     def __init__(self, qs_on, q_N):
         self._q1, self._q2 = qs_on[0], qs_on[1]
         self._q_N = q_N
         self._theta = 0
         self._is_param = True
         self._set_properties()
-        self._fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
-        self._fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
+        #self._fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
+        #self._fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
         self._I = iden(self._q_N)
         self._operation = self._set_op()
 
     def _set_properties(self):
         self._gate = iden
-        self._pauli = iden
+        self._pauli = iden    
 
     def _set_op(self): #analytic expression for exponent of pauli is cos(x)*I + sin(x)*pauli_str
         return np.cos(self._theta / 2) * self._I - 1j * np.sin(self._theta / 2) * self._fock1 * self._fock2
@@ -345,19 +345,22 @@ class RR(PRot, EntGate):
 class R_zz(RR):
     def _set_properties(self):
         self._gate = qt.qip.operations.rz
-        self._pauli = qt.sigmaz()
+        self._fock1 = qt.qip.operations.z_gate(N=self._q_N, target=self._q1)
+        self._fock2 = qt.qip.operations.z_gate(N=self._q_N, target=self._q2)
 
 
 class R_xx(RR):
     def _set_properties(self):
         self._gate = qt.qip.operations.rx
-        self._pauli = qt.sigmax()
+        self._fock1 = qt.qip.operations.x_gate(N=self._q_N, target=self._q1)
+        self._fock2 = qt.qip.operations.x_gate(N=self._q_N, target=self._q2)
 
 
 class R_yy(RR):
     def _set_properties(self):
         self._gate = qt.qip.operations.ry
-        self._pauli = qt.sigmay()
+        self._fock1 = qt.qip.operations.y_gate(N=self._q_N, target=self._q1)
+        self._fock2 = qt.qip.operations.y_gate(N=self._q_N, target=self._q2)
 
 
 class RR_block(shared_parameter):
@@ -366,15 +369,26 @@ class RR_block(shared_parameter):
         self._theta = 0
         self._q_N = q_N
         self._is_param = True
+        self._layer = self.gen_layer()
         self._operation = self._set_op()
-
-    def _set_op(self):
+    
+    def gen_layer(self):
         N = self._q_N
         indices = []
         for i in range(N):
             index_pair = [i, (i + 1) % N] #boundary condition that N+1 = 0
             indices.append(index_pair)
-        self._layer = [self._rotator(index_pair, N) for index_pair in indices]
+        layer = [self._rotator(index_pair, N) for index_pair in indices]
+        return layer
+    
+    def set_theta(self, theta):
+        self._theta = theta
+        for gate in self._layer:
+            gate.set_theta(theta)
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        
         operation = prod(self._layer[::-1])
         return operation
 

@@ -115,9 +115,6 @@ class Measurements():
         P_haar = haar / sum(haar) #do i need to normalise this?
 
         expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
-        #P_bar_Q = np.where(P_pqc > 0, P_pqc / P_haar, 1) #if P_pqc = 0 then replace w/ 1 as log(1) = 0
-        #log = np.log(P_bar_Q) #take natural log of array
-        #expr = np.sum(P_pqc * log) #from definition of KL divergence = relative entropy = Expressibility
         return expr
 
     def expressibility(self, sample_N, graphs=False):
@@ -358,19 +355,19 @@ class Measurements():
         def trajmaj(Xi):
             eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
             magics.append(eom)
+            print(Xi)
             trajectory = self._QC.cost(Xi)
             traj.append(trajectory)
         
         self._QC._quantum_state = self._QC.run(angles=angles)
         trajmaj(angles)
 
-        if method.lower() in ["gradient", "QNG"]:
+        if method.lower() in ["gradient", "qng"]:
             self._QC._quantum_state = self._QC.run(angles=angles)
             psi = self._QC._quantum_state
             prev_energy = self._QC.cost(angles)
             while diff > epsilon and count < quit_iterations:
-                if count % 100 == 0:
-                    print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
+                psi = self._QC._quantum_state
     
                 if magic is True:
                     eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
@@ -384,7 +381,7 @@ class Measurements():
                     d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
                     gradients.append(d_i_f_theta)
                 theta = self._QC.get_params()
-    
+
                 if method == "gradient":
                     theta_update = list(np.array(theta) - rate * np.array(gradients))
                 elif method == "QNG": #some serious problems here, think we need renormalizaiton
@@ -392,6 +389,11 @@ class Measurements():
                     inverse = np.linalg.pinv(QFI)
                     f_inv_grad_psi = inverse.dot(np.array(gradients))
                     theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
+                
+                if count % 100 == 0:
+                    print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
+                    #print(theta_update)
+                
                 energy = self._QC.cost(theta_update)
                 diff = np.abs(energy - prev_energy)
                 count += 1

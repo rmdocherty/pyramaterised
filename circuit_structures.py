@@ -116,7 +116,7 @@ def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
 def gen_TFIM_layers(p, N):
     layers = []
     init_layer = [pqc.H(i, N) for i in range(N)]
-    layers.append(init_layer)
+    #layers.append(init_layer)
     for i in range(p):
         first_half = [pqc.RR_block(pqc.R_zz, N)]
         second_layer = [pqc.R_x(i, N) for i in range(N)]
@@ -130,6 +130,6 @@ def TFIM_hamiltonian(N, g, h=0):
     H = 0
     for i in range(N):
         i_plus = (i + 1) % N
-        H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N)
+        H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N) + h * genFockOp(qt.sigmaz(), i, N)
     H = -1 * H
     return H
