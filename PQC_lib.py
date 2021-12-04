@@ -483,9 +483,9 @@ class PQC():
             print(f"Energy of state is {e}")
         return self._quantum_state
 
-    def cost(self, x):
+    def cost(self, theta):
         """Get energy of |psi>, the initial quantum state"""
-        self._quantum_state = self.run(angles=x)
+        self._quantum_state = self.run(angles=theta)
         psi = self._quantum_state
         energy = qt.expect(self.H, psi)
         return energy

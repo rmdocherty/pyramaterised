@@ -177,9 +177,9 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQ
 
 #%%
 random.seed(1000)
-N = 2
-p = 2
-trainer = "BFGS"
+N = 4
+p = 4
+trainer = "bfgs"
 
 init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
 layer1 =  [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)] #+ [pqc.CHAIN(pqc.CNOT, N)]  #[pqc.R_y(i, N) for i in range(N)] +
@@ -198,26 +198,13 @@ for i in range(10):
     print(i)
     qg_circuit = pqc.PQC(N)
     qg_circuit.add_layer(layer1, n=p)
-    qg_circuit.set_H(hamiltonian)
+    #qg_circuit.set_H(hamiltonian)
     qg_circuit_m = Measurements(qg_circuit)
     random_angles = [random.random()*2*np.pi for i in range(2*4*p)] #should this be haar random?
     out = qg_circuit_m.train(method=trainer, trajectory=True, magic=True, angles=random_angles, rate=0.001, epsilon=1e-6)
     all_entropies.append(out[2])
     all_trajectories.append(out[1])
     print(qg_circuit_m._QC._fidelity(groundstate))
-
-#%%
-count = 0
-for state_list in all_states:
-    print(f"Initilization {count}")
-    for state in state_list:
-        if state == state_list[-1]:
-            print(state)
-            print(state.ptrace(0))
-            print(state.ptrace(1))
-            print(qt.expect(qg_circuit.H, state))
-            print("\n")
-    count += 1
 
 #%%
 magics = extend(all_entropies)
@@ -276,20 +263,20 @@ plt.legend(fontsize=18)
 Measure TFIM magic for a range of different initilizations
 """
 
+random.seed(1000)
 N, p = 4, 4
 N_repeats = 10
 g, h = 1, 0
-random.seed(3)
+
 all_entropies = []
 all_trajectories = []
 
 #%%
-for i in range(5):
+for i in range(10):
     print(i)
     TFIM = pqc.PQC(N)
     #need to use |+> as initial state for TFIM model
     plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
-    #TFIM.set_initial_state(plus_state)
     
     hamiltonian = TFIM_hamiltonian(N, g=g, h=h)
     groundstate = hamiltonian.groundstate()[1]

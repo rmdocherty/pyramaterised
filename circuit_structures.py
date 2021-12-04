@@ -115,13 +115,24 @@ def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
 
 def gen_TFIM_layers(p, N):
     layers = []
-    init_layer = [pqc.H(i, N) for i in range(N)]
-    #layers.append(init_layer)
     for i in range(p):
         first_half = [pqc.RR_block(pqc.R_zz, N)]
         second_layer = [pqc.R_x(i, N) for i in range(N)]
         second_half = [pqc.shared_parameter(second_layer, N)]
         layer = first_half + second_half
+        layers.append(layer)
+    return layers
+
+
+def gen_modified_TFIM_layers(p, N):
+    layers = []
+    for i in range(p):
+        first_half = [pqc.RR_block(pqc.R_zz, N)]
+        second_layer = [pqc.R_x(i, N) for i in range(N)]
+        second_half = [pqc.shared_parameter(second_layer, N)]
+        third_layer = [pqc.R_z(i, N) for i in range(N)]
+        third_half = [pqc.shared_parameter(third_layer, N)]
+        layer = first_half + second_half + third_half
         layers.append(layer)
     return layers
 
@@ -133,3 +144,25 @@ def TFIM_hamiltonian(N, g, h=0):
         H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N) + h * genFockOp(qt.sigmaz(), i, N)
     H = -1 * H
     return H
+
+
+def gen_XXZ_layers(p, N):
+    even_indices = []
+    odd_indices = []
+    for i in range(N // 2):
+        even_indices.append((2 * i - 1, 2 * i))
+        odd_indices.append((2 * i, 2 * i + 1))
+    layers = []
+    for l in p:
+        ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
+        YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
+        ZZ_2 = [pqc.R_zz((i, j), N) for i, j in even_indices]
+        YY_XX_2 = [pqc.R_yy((i, j), N) for i, j in even_indices] + [pqc.R_xx((i, j), N) for i, j in even_indices]
+        theta = [pqc.shared_parameter(ZZ_1, N)]
+        phi = [pqc.shared_parameter(YY_XX_1, N)]
+        beta = [pqc.shared_parameter(ZZ_2, N)]
+        gamma = [pqc.shared_parameter(YY_XX_2, N)]
+        layer = theta + phi + beta + gamma
+        layers.append(layer)
+    return layers
+

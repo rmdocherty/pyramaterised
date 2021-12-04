@@ -18,6 +18,10 @@ import random
 class Measurements():
     def __init__(self, QC):
         self._QC = QC
+        self.minimize_function = QC.cost
+    
+    def set_minimise_function(self, function):
+        self.minimize_function = function
 
     def _get_QFI(self, grad_list=[]):
         """
@@ -218,7 +222,15 @@ class Measurements():
         if magic > np.log(d + 1) - np.log(2):
             raise Exception("Magic max exceeded!")
         return magic
-    
+
+    def theta_to_magic(self, theta, P_n=[]):
+        if P_n == []:
+            P_n = self._gen_pauli_group()
+        QC = self._QC
+        QC._quantum_state = QC.run(angles=theta)
+        eom = self.entropy_of_magic(QC._quantum_state, P_n)
+        return -1 * eom # -1 so we can minize easily
+
     def _gen_F_n_2(self):
         N = self._QC._n_qubits
         strings = list(product([0,1], repeat=N))
@@ -338,6 +350,17 @@ class Measurements():
         print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
         return mwexpr, mwstd 
 
+    def get_gradient_vector(self, theta):
+        psi = self._QC._quantum_state
+        self.gradient_list = self._QC.get_gradients()
+        gradients = []
+        for i in self.gradient_list:
+            deriv = i
+            H_di_psi = self._QC.H * deriv
+            d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
+            gradients.append(d_i_f_theta)
+        return gradients
+
     def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False):
         quit_iterations = 100000
         count = 0
@@ -345,63 +368,53 @@ class Measurements():
         traj = []
         magics = []
 
-        if angles == []:
-            #random.seed(1)
-            n_params = len(self._QC._parameterised)
-            angles = [random.random() * 2 * np.pi for i in range(n_params)]
-
         P_n = self._gen_pauli_group()
-            
+
         def trajmaj(Xi):
             eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
             magics.append(eom)
-            print(Xi)
-            trajectory = self._QC.cost(Xi)
+            trajectory = self.minimize_function(Xi)
             traj.append(trajectory)
-        
+
         self._QC._quantum_state = self._QC.run(angles=angles)
         trajmaj(angles)
 
         if method.lower() in ["gradient", "qng"]:
             self._QC._quantum_state = self._QC.run(angles=angles)
-            psi = self._QC._quantum_state
-            prev_energy = self._QC.cost(angles)
+            prev_energy = self.minimize_function(angles)
             while diff > epsilon and count < quit_iterations:
-                psi = self._QC._quantum_state
-    
+
                 if magic is True:
                     eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
                     magics.append(eom)
-    
-                gradient_list = self._QC.get_gradients()
-                gradients = []
-                for i in gradient_list:
-                    deriv = i
-                    H_di_psi = self._QC.H * deriv
-                    d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
-                    gradients.append(d_i_f_theta)
+
                 theta = self._QC.get_params()
+                gradients = self.get_gradient_vector(theta)
 
                 if method == "gradient":
                     theta_update = list(np.array(theta) - rate * np.array(gradients))
                 elif method == "QNG": #some serious problems here, think we need renormalizaiton
-                    QFI = self._get_QFI(grad_list=gradient_list)
+                    QFI = self._get_QFI(grad_list=self.gradient_list)
                     inverse = np.linalg.pinv(QFI)
                     f_inv_grad_psi = inverse.dot(np.array(gradients))
                     theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
-                
+
                 if count % 100 == 0:
                     print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
                     #print(theta_update)
-                
-                energy = self._QC.cost(theta_update)
+
+                energy = self.minimize_function(theta_update)
                 diff = np.abs(energy - prev_energy)
                 count += 1
                 prev_energy = energy
                 traj.append(energy)
             print(f"Finished after {count} iterations with cost function = {energy}")
         else:
-            op_out = scipy.optimize.minimize(self._QC.cost, x0=angles, method=method, callback=trajmaj, tol=epsilon)
+            if self.minimize_function == self.theta_to_magic:
+                op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
+                                                method=method, args=[P_n], callback=trajmaj, tol=epsilon)
+            else:
+                op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
+                                                method=method, callback=trajmaj, tol=epsilon, jac=self.get_gradient_vector)
             energy = op_out.fun
         return [energy, traj, magics]
-

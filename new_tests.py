@@ -180,7 +180,7 @@ print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%% 
 """Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
  to 1e-6 accuracy and cost function is 0.34583907096349875"""
-out = qg_m.train(rate=0.01, method="gradient", angles=[])
+out = qg_m.train(rate=0.01, method="gradient", angles=[random.random() * 2 * np.pi for i in range(12)])
 print(out)
 """Lowest we've recorded is -0.69589... but there is massive variance"""
 #%% =============================ENTROPY OF MAGIC TESTS=============================
@@ -338,7 +338,7 @@ for l in layers:
 
 NPQC_m = Measurements(NPQC)
 #%%
-out = NPQC_m.train(rate=0.01, epsilon=1e-3)
+out = NPQC_m.train(rate=0.01, epsilon=1e-6)
 
 
 #%%
@@ -360,7 +360,7 @@ op = find_overparam_point(test, [0])
 print(f"Test circuit overparameterised after {op} layesr added")
 #%%
 test_m = Measurements(test)
-ener, traj, *others = test_m.train(trajectory=True)
+ener, traj, *others = test_m.train(trajectory=True, rate=0.01)
 
 
 iterations = range(len(traj))
@@ -374,7 +374,7 @@ Test TFIM overparameterisation values for different N.
 """
 
 N, p = 4, 4
-g_0, h_0 = 1, 0
+g_0, h_0 = 2, 3
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
@@ -382,7 +382,7 @@ plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
 final_state = qt.tensor([plus_state for i in range(N)])
 TFIM.set_initial_state(plus_state)
 
-hamiltonian = TFIM_hamiltonian(N, g=g_0)
+hamiltonian = TFIM_hamiltonian(N, g=g_0, h=h_0)
 groundstate_energy, groundstate = hamiltonian.groundstate()
 a = hamiltonian.eigenenergies()
 print(groundstate_energy, groundstate)
@@ -399,17 +399,14 @@ random_angles = [random.random()*np.pi for i in range(2*p)]
 clifford_angles = [0 for i in range(2*p)]
 
 TFIM_m = Measurements(TFIM)
-#out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles)
-#BFGS_min = out[0]
-#print(TFIM.get_params())
+#TFIM_m.set_minimise_function(TFIM_m.theta_to_magic)
+print(TFIM_m.minimize_function)
+out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
 
-#print("before", TFIM)
-out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
-#print("after", TFIM)
 grad_min = out[0]
-#print(f"BFGS (scipy minimizer) TFIM min = {BFGS_min}, gradient min = {grad_min}")
+
 print(grad_min)
-#print(TFIM.get_params())
+
 #%%
 overlap = TFIM_m._QC._fidelity(groundstate)
 print(f"Fidelity of TFIM circuit state after training with groundstate is {overlap} for g={g_0}")
@@ -421,7 +418,7 @@ plt.figure("magic")
 
 max_magic = np.log((2**N) + 1) - np.log(2)
 magics = np.array(out[2]) / max_magic
-iterations = range(len(magics))
+iterations = range(len(magics   ))
 plt.plot(iterations, magics, lw=4, color="green")
 pretty_graph("Training Iteration", "Fractional Reyni Entropy of Magic", f"Magic during {N} qubit {p} layer TFIM training initialised with random angles", 20)
 
