@@ -361,12 +361,13 @@ class Measurements():
             gradients.append(d_i_f_theta)
         return gradients
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False, ent=False):
         quit_iterations = 100000
         count = 0
         diff = 1
         traj = []
         magics = []
+        ents = []
 
         P_n = self._gen_pauli_group()
 
@@ -375,6 +376,8 @@ class Measurements():
             magics.append(eom)
             trajectory = self.minimize_function(Xi)
             traj.append(trajectory)
+            entanglement = self._single_Q(self._QC._quantum_state, self._QC._n_qubits)
+            ents.append(entanglement)
 
         self._QC._quantum_state = self._QC.run(angles=angles)
         trajmaj(angles)
@@ -384,9 +387,10 @@ class Measurements():
             prev_energy = self.minimize_function(angles)
             while diff > epsilon and count < quit_iterations:
 
-                if magic is True:
-                    eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
-                    magics.append(eom)
+                #if magic is True:
+                #    eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+                #    magics.append(eom)
+                
 
                 theta = self._QC.get_params()
                 gradients = self.get_gradient_vector(theta)
@@ -405,9 +409,11 @@ class Measurements():
 
                 energy = self.minimize_function(theta_update)
                 diff = np.abs(energy - prev_energy)
+
+                trajmaj(theta_update)
                 count += 1
-                prev_energy = energy
-                traj.append(energy)
+                #prev_energy = energy
+                #traj.append(energy)
             print(f"Finished after {count} iterations with cost function = {energy}")
         else:
             if self.minimize_function == self.theta_to_magic:
@@ -417,4 +423,4 @@ class Measurements():
                 op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
                                                 method=method, callback=trajmaj, tol=epsilon, jac=self.get_gradient_vector)
             energy = op_out.fun
-        return [energy, traj, magics]
+        return [energy, traj, magics, ents]

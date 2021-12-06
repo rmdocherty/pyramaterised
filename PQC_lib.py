@@ -451,6 +451,7 @@ class PQC():
                 param_count += 1
             else:
                 self._parameterised.append(-1)
+        self.n_params = len([i for i in self._parameterised if i > -1])
 
     def get_params(self):
         angles = [g._theta for g in self.gates if g._is_param]
