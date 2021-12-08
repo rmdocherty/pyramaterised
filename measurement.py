@@ -315,6 +315,7 @@ class Measurements():
             magic_bar, magic_std = np.mean(magics), np.std(magics)
         else:
             magic_bar, magic_std = 0, 0
+
         return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std]}
 
     def meyer_wallach(self, sample_N): 
@@ -361,7 +362,7 @@ class Measurements():
             gradients.append(d_i_f_theta)
         return gradients
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False, ent=False):
+    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False, ent=False, verbose=False):
         quit_iterations = 100000
         count = 0
         diff = 1
@@ -403,18 +404,15 @@ class Measurements():
                     f_inv_grad_psi = inverse.dot(np.array(gradients))
                     theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
 
-                if count % 100 == 0:
+                if count % 100 == 0 and verbose is True:
                     print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
-                    #print(theta_update)
-
                 energy = self.minimize_function(theta_update)
                 diff = np.abs(energy - prev_energy)
 
                 trajmaj(theta_update)
                 count += 1
-                #prev_energy = energy
-                #traj.append(energy)
-            print(f"Finished after {count} iterations with cost function = {energy}")
+                prev_energy = energy
+            #print(f"Finished after {count} iterations with cost function = {energy}")
         else:
             if self.minimize_function == self.theta_to_magic:
                 op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 

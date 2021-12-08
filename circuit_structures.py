@@ -114,7 +114,8 @@ def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
 
 
 def gen_TFIM_layers(p, N):
-    layers = []
+    initial_layer = [pqc.H(i, N) for i in range(N)]
+    layers = [initial_layer]
     for i in range(p):
         first_half = [pqc.RR_block(pqc.R_zz, N)]
         second_layer = [pqc.R_x(i, N) for i in range(N)]

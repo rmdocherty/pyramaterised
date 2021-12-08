@@ -180,8 +180,21 @@ print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%% 
 """Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
  to 1e-6 accuracy and cost function is 0.34583907096349875"""
-out = qg_m.train(rate=0.01, method="gradient", angles=[random.random() * 2 * np.pi for i in range(12)])
+qg_m.set_minimise_function(qg_m.theta_to_magic)
+out = qg_m.train(rate=0.01, method="BFGS", angles=[random.random() * 2 * np.pi for i in range(12)])
+
 print(out)
+print(qg_circuit)
+
+#%%
+iterations = range(len(out[2]))
+plt.plot(iterations, np.array(out[2]) / (np.log((2**N) + 1) - np.log(2)), lw=4)
+
+print(np.abs(qg_circuit._quantum_state.data.toarray()))
+
+pretty_graph("Iterations", "Cost function", "Cost function vs iterations for overparameterised PQC", 20)
+
+
 """Lowest we've recorded is -0.69589... but there is massive variance"""
 #%% =============================ENTROPY OF MAGIC TESTS=============================
 
@@ -373,14 +386,14 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 4, 4
-g_0, h_0 = 2, 3
+N, p = 4, 7
+g_0, h_0 = 1, 0
 
 TFIM = pqc.PQC(N)
 #need to use |+> as initial state for TFIM model
 plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
 final_state = qt.tensor([plus_state for i in range(N)])
-TFIM.set_initial_state(plus_state)
+#TFIM.set_initial_state(plus_state)
 
 hamiltonian = TFIM_hamiltonian(N, g=g_0, h=h_0)
 groundstate_energy, groundstate = hamiltonian.groundstate()
@@ -399,7 +412,7 @@ random_angles = [random.random()*np.pi for i in range(2*p)]
 clifford_angles = [0 for i in range(2*p)]
 
 TFIM_m = Measurements(TFIM)
-#TFIM_m.set_minimise_function(TFIM_m.theta_to_magic)
+TFIM_m.set_minimise_function(TFIM_m.theta_to_magic)
 print(TFIM_m.minimize_function)
 out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
 
@@ -475,3 +488,21 @@ print(analytic_overlap)
 
 #%%
 
+N, p = 4, 4
+g_0, h_0 = 1, 0
+
+TFIM = pqc.PQC(N)
+#need to use |+> as initial state for TFIM model
+plus_state = (1/np.sqrt(2)) * (qt.basis(2,0) + qt.basis(2,1))
+final_state = qt.tensor([plus_state for i in range(N)])
+#TFIM.set_initial_state(plus_state)
+
+hamiltonian = TFIM_hamiltonian(N, g=g_0, h=h_0)
+groundstate_energy, groundstate = hamiltonian.groundstate()
+a = hamiltonian.eigenenergies()
+print(groundstate_energy, groundstate)
+TFIM.set_H(hamiltonian)
+
+TFIM_layers = gen_TFIM_layers(p, N)
+for l in TFIM_layers:
+    TFIM.add_layer(l)

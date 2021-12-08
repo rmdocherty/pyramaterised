@@ -176,7 +176,7 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for NPQ
 
 
 #%%
-random.seed(1000)
+#random.seed(1000)
 N = 4
 p = 4
 trainer = "bfgs"
@@ -198,7 +198,7 @@ for i in range(10):
     print(i)
     qg_circuit = pqc.PQC(N)
     qg_circuit.add_layer(layer1, n=p)
-    #qg_circuit.set_H(hamiltonian)
+    qg_circuit.set_H(hamiltonian)
     qg_circuit_m = Measurements(qg_circuit)
     random_angles = [random.random()*2*np.pi for i in range(2*4*p)] #should this be haar random?
     out = qg_circuit_m.train(method=trainer, trajectory=True, magic=True, angles=random_angles, rate=0.001, epsilon=1e-6)
