@@ -281,6 +281,35 @@ class Measurements():
         GKP = np.log2(GKP)
         return GKP
 
+    def GKP_Magic(self, psi=None):
+        n_qubits = self._QC._n_qubits
+        if psi is None:
+            psi = self._QC._quantum_state
+        n_qubits = self._QC._n_qubits
+        mag = 2**self._QC._n_qubits
+        to_index=2**np.arange(n_qubits)[::-1]
+        conv_matrix_0=np.zeros([mag,mag],dtype=int)
+        base_states = []
+        for i in list(product([0,1], n_qubits)):
+            base_states.append(np.array(i[0]))
+        for j_count in range(mag):
+            base_j=base_states[j_count]
+            k_plus_j=np.mod(base_states+base_j,2)
+            k_plus_j_index=np.sum(k_plus_j*to_index,axis=1)
+            conv_matrix_0[j_count,:]=k_plus_j_index
+        conv_matrix_1=np.zeros([mag,mag],dtype=int)
+        for i_count in range(mag):
+            base_i=base_states[i_count]
+            binary_product=np.mod(np.dot(base_states,base_i),2)
+            conv_matrix_1[i_count,:]=(-1)**binary_product
+        coeffs= psi.data.toarray()[:,0]
+        GKP = 0
+        GKP= np.sum(np.abs(np.dot(coeffs*conv_matrix_0, coeffs[conv_matrix_1] )))/(mag)
+        GKP = np.log2(GKP)
+        return GKP
+
+
+
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True):
         n = self._QC._n_qubits
         states = [self._QC.gen_quantum_state() for i in range(sample_N)]
