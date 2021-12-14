@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import scipy
+import pickle
 
 from measurement import Measurements
 from math import isclose
@@ -78,9 +79,13 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     training_entanglement = []
     training_costs = []
     training_fidelities = []
+    training_final_states = []
 
     max_magic = max_magic = np.log((2**n_qubits) + 1) - np.log(2)
-
+    circuit_metadata = {"Type": circuit_type, "N_qubits": n_qubits, "H": hamiltonian, 
+                        "angles": start, "train": train, "train_method": train_method,
+                        "epsilon": epsilon, "rate": rate, "n_repeats": n_repeats, 
+                        "n_samples": n_samples}
     circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian)
     circuit_m = Measurements(circuit)
 
@@ -88,9 +93,28 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     circuit_expr = circuit_data['Expr']
     circuit_entanglement, circuit_entanglement_std = circuit_data['Ent']
     circuit_magic, circuit_magic_std = circuit_data['Magic']
+    circuit_GKP, circuit_GKP_std = circuit_data['GKP']
+    circuit_QFI = circuit_m._get_QFI()
+    circuit_eigvals, _ = circuit_m.get_eigenvalues(circuit_QFI)
+    circuit_capped_eigvals = circuit_m.new_measure(circuit_QFI)
+    circuit_gradients = []
 
-    circuit_data_dict = {"Expr": circuit_expr, "Ent": circuit_entanglement, "Reyni": circuit_magic / max_magic, "GKP": -1, "Fidelity": -1}
-    circuit_std_dict = {"Expr": -1, "Ent": circuit_entanglement_std, "Reyni": circuit_magic_std / max_magic, "GKP": -1, "Fidelity": -1}
+    for i in range(n_samples):
+        if start == "random":
+            init_angles = [random.random() * 2 * np.pi for i in range(circuit.n_params)]
+        elif start == "clifford":
+            clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
+            init_angles = [random.choice(clifford_angles) for i in range(circuit.n_params)]
+        gradients = circuit_m.get_gradient_vector(init_angles)
+        for g in gradients:
+            circuit_gradients.append(g)
+    circuit_var_grad = np.var(circuit_gradients)
+
+    circuit_data_dict = {"Expr": circuit_expr, "Ent": circuit_entanglement, "Ent_std": circuit_entanglement_std, 
+                         "Reyni": circuit_magic / max_magic, "Reyni_std": circuit_magic_std / max_magic, 
+                         "GKP": circuit_GKP, "GKP_std": circuit_GKP_std, "Var_grad": circuit_var_grad, "QFIM_e-vals": circuit_eigvals, 
+                         "Capped_e-vals": circuit_capped_eigvals}
+    #circuit_std_dict = {"Ent": circuit_entanglement_std, "Reyni": circuit_magic_std / max_magic, "GKP": -1}
 
     if train is True:
         for i in range(n_repeats):
@@ -119,7 +143,8 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
             training_costs.append(cost)
             training_magics.append(magic)
             training_entanglement.append(ent)
-            
+            circuit_final_state = np.abs(circuit._quantum_state.data.toarray())
+            training_final_states.append(circuit_final_state)
 
         training_costs = extend(training_costs)
         training_magics = extend(training_magics)
@@ -128,66 +153,18 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
         mean_magic, std_magic = np.mean(training_magics[:, -1]) / max_magic, np.std(training_magics[:, -1]) / max_magic
         mean_ent, std_ent = np.mean(training_entanglement[:, -1]), np.std(training_entanglement[:, -1])
         mean_fidelity, std_fidelities = np.mean(training_fidelities), np.std(training_fidelities)
-        training_final_data = {"Expr": -1, "Ent": mean_ent, "Reyni": mean_magic, "GKP": -1, "Fidelity": mean_fidelity}
-        training_final_std = {"Expr": -1, "Ent": std_ent, "Reyni": std_magic, "GKP": -1, "Fidelity": mean_fidelity}
+        training_final_data = {"Cost_arrs": training_costs, "Ent": mean_ent, "Ent_std": std_ent, "Ent_arrs": training_entanglement , "Reyni": mean_magic, "Reyni_std": std_magic, "Reyni_arrs": training_magics, "GKP": -1, "GKP_std": -1, "Final_states": training_final_states}
+
+    out_dict = {"Metatdata": circuit_metadata, "Circuit_data": circuit_data_dict, "Training_data": training_final_data}
 
     if save is True:
         file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{train_method}"
-        directory = "data/" + file_name
-        mkdir(directory)
-        with open(directory + "/" + file_name + "properties.txt", 'w+') as file:
-            file.write(f"{n_qubits} qubit, {n_layers} layer {circuit_type} PQC using {hamiltonian} hamiltonian, trained using {train_method} and averaged over {n_repeats} repeats. \n")
-            file.write(f"Following properties calculated using {n_samples} state samples: \n")
-            file.write(f"Circuit expressibility is {circuit_expr}\n")
-            file.write(f"Circuit Entanglement is {circuit_entanglement} +/- {circuit_entanglement_std}\n")
-            file.write(f"Circuit Reyni Entropy of Magic is {circuit_magic} +/- {circuit_magic_std}\n")
-            if circuit_type == "HE":
-                file.write(circuit.__repr__())
-        if train is True:
-            for key, value in training_data.items():
-                np.save(directory + "/" + file_name + key, value)
+        with open(f'{file_name}.pickle', 'wb') as handle:
+            pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    if plot is True:
-        iters = range(len(training_costs[0]))
-        
-        frac_mag = training_data["magics"] / max_magic
-        fig, axes = plt.subplots(2, 2, sharex=True)
-        fig.suptitle(f"{n_qubits} qubit, {n_layers} layer {circuit_type} with {hamiltonian} hamiltonian, optimized with {train_method}", fontsize=20)
-        for i in training_data["costs"]:
-            axes[0, 0].plot(iters, i, color='orange', lw=1)
-        pretty_subplot(axes[0, 0], "Iterations", "Cost function", "", fontsize=18)
-        for i in frac_mag:
-            axes[0, 1].plot(iters, i, color='green', lw=1)
-        pretty_subplot(axes[0, 1], "Iterations", "Fractional Reyni Magic", "", fontsize=18)
-        for i in training_data["ents"]:
-            axes[1, 0].plot(iters, i, color='blue', lw=1)
-        pretty_subplot(axes[1, 0], "Iterations", "Training Entanglement", "", fontsize=18)
-        axes[1, 1].axis('off')
-        
-        data = [circuit_data_dict, training_final_data]
-        data_std = [circuit_std_dict, training_final_std]
-
-        cell_text = []
-        for key, row in circuit_data_dict.items():
-            current_row = []
-            for column in range(2):
-                if data[column][key] == -1 :
-                    value = "-"
-                else:
-                    value = f"{data[column][key]:.3f}"
-                if data_std[column][key] == -1:
-                    std = ""
-                else:
-                    std = f" ± {data_std[column][key]:.2f}"
-                text = value + std
-                current_row.append(text)
-            cell_text.append(current_row)
-        table = axes[1, 1].table(cellText=cell_text, rowLabels=list(data[0].keys()),\
-                                 colLabels=["Initial", "Final"], loc='center', \
-                                     fontsize=20, cellLoc='center', rowLoc='center')
-
-    return training_data, circuit_data
+    return out_dict
 
 
 #%%
-measure_everything(CIRCUIT, 4, 4, 10, 100, HAMILTONIAN, train_method='gradient', save=False)
+a = measure_everything("TFIM", 4, 4, 2, 100, HAMILTONIAN, start='random', train_method='BFGS', save=True)
+print(a)

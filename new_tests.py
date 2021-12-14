@@ -138,7 +138,7 @@ print(f"Circuit 11 expr for {L} layers is  {c11_out['Expr']}")
 
 #%% =============================QUANTUM GEOMETRY CIRCUIT TESTS=============================
 """Tests based on default circuit in arXiv:2102.01659v1 github"""
-qg_circuit = pqc.PQC(4)
+qg_circuit = pqc.PQC(8)
 init_layer = [pqc.fixed_R_y(i, 4, np.pi / 4) for i in range(4)]
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
@@ -148,7 +148,7 @@ layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
-qg_circuit.add_layer(layer3, n=1)
+qg_circuit.add_layer(layer3, n=8)
 
 qg_circuit.gen_quantum_state()
 default_angles = [
@@ -164,7 +164,7 @@ default_angles = [
 qg_circuit._quantum_state = qt.Qobj(qg_circuit.run())
 print(qg_circuit)
 
-energy = qg_circuit.cost(default_angles)
+#energy = qg_circuit.cost(default_angles)
 
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
@@ -217,7 +217,7 @@ class One:
 
 bell_m = Measurements(Bell())
 e = bell_m.entropy_of_magic()
-g = bell_m.GKP_magic()
+g = bell_m.GKP_Magic()
 print(f"Reyni Entropy of Magic is {e}, should be 0 for stabiliser state")
 print(f"GKP Magic is {g}, should be 0 for stabiliser state")
 
@@ -244,7 +244,7 @@ for n in range(2, max_N):
         c_c_m = Measurements(clifford_circuit)
         e = c_c_m.entropy_of_magic()
         entropies.append(e)
-        gkp = c_c_m.GKP_magic()
+        gkp = c_c_m.GKP_Magic()
         GKPs.append(gkp)
 
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.
@@ -285,9 +285,12 @@ class Haar():
         haar = qt.random_objects.rand_unitary_haar(2**N, [[2 for i in range(N)], [2 for i in range(N)]])
         self._quantum_state = haar * circuit_state
         return self._quantum_state
+    
+    def cost(self):
+        return None
 
 
-for i in range(2, 8):
+for i in range(2, 9):
     haar = Haar(i)
     haar_m = Measurements(haar)
     magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=True)
@@ -386,7 +389,7 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 4, 7
+N, p = 8, 7
 g_0, h_0 = 1, 0
 
 TFIM = pqc.PQC(N)

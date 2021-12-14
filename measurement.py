@@ -18,7 +18,10 @@ import random
 class Measurements():
     def __init__(self, QC):
         self._QC = QC
-        self.minimize_function = QC.cost
+        try:
+            self.minimize_function = QC.cost
+        except AttributeError:
+            self.minimize_function = 0
     
     def set_minimise_function(self, function):
         self.minimize_function = function
@@ -60,6 +63,10 @@ class Measurements():
                 qfi_matrix[q, p] = qfi_matrix[p, q]
         return qfi_matrix
 
+    def get_eigenvalues(self, QFI):
+        eigvals, eigvecs = scipy.linalg.eigh(QFI)
+        return eigvals, eigvecs
+
     def get_effective_quantum_dimension(self, cutoff_eigvals):
         """
         Get EFD by counting the # of non-zero eigenvalues of the QFI matrix.
@@ -74,8 +81,9 @@ class Measurements():
         eff_quant_dim = len(nonzero_eigvals)
         return eff_quant_dim
 
-    def new_measure(self):
-        QFI = self._get_QFI()
+    def new_measure(self, QFI=None):
+        if QFI is None:
+            QFI = self._get_QFI()
         eigvals, eigvecs = scipy.linalg.eigh(QFI)
         capped = [1 if v > 1 else v for v in eigvals]
         return sum(capped)
@@ -257,15 +265,15 @@ class Measurements():
             psi = self._QC._quantum_state
         n_qubits = self._QC._n_qubits
         mag = 2**self._QC._n_qubits
-        to_index=2**np.arange(n_qubits)[::-1]
+        to_index= 2**np.arange(n_qubits)[::-1]
         conv_matrix_0=np.zeros([mag,mag],dtype=int)
         base_states = []
-        for i in list(product([0,1], n_qubits)):
+        for i in list(product([0,1], repeat=n_qubits)):
             base_states.append(np.array(i[0]))
         for j_count in range(mag):
             base_j=base_states[j_count]
             k_plus_j=np.mod(base_states+base_j,2)
-            k_plus_j_index=np.sum(k_plus_j*to_index,axis=1)
+            k_plus_j_index=np.sum(k_plus_j*to_index,axis=0)
             conv_matrix_0[j_count,:]=k_plus_j_index
         conv_matrix_1=np.zeros([mag,mag],dtype=int)
         for i_count in range(mag):
@@ -279,7 +287,7 @@ class Measurements():
         return GKP
 
 
-    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True):
+    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True):
         n = self._QC._n_qubits
         states = [self._QC.gen_quantum_state() for i in range(sample_N)]
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
@@ -296,6 +304,7 @@ class Measurements():
 
         P_n = self._gen_pauli_group()
         magics = []
+        gkps = []
         q_vals = []
 
         if ent:
@@ -314,7 +323,13 @@ class Measurements():
         else:
             magic_bar, magic_std = 0, 0
 
-        return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std]}
+        if GKP:
+            for psi in states:
+                gkp = self.GKP_Magic(psi)
+                gkps.append(gkp)
+            gkp_bar, gkp_std = np.mean(gkps), np.std(gkps)
+
+        return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std], "GKP": [gkp_bar, gkp_std]}
 
     def meyer_wallach(self, sample_N): 
         N = self._QC._n_qubits
