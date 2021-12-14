@@ -251,36 +251,6 @@ class Measurements():
             coeffs.append(c_i)
         return coeffs
 
-    def GKP_magic(self, psi=None, F=[]):
-        if F == []:
-            F, S = self._gen_F_n_2()
-        N = self._QC._n_qubits
-        if psi is None:
-            psi = self._QC._quantum_state
-        coeffs = []
-        for state in F:
-            c_i = psi.overlap(state)
-            #print(c_i)
-            coeffs.append(c_i)
-        GKP = 0
-        mag = len(F)
-        #print(S)
-        for i_count in range(mag):
-            for j_count in range(mag):
-                for k_count in range(mag):
-                    i = S[i_count]
-                    j = S[j_count]
-                    k = S[k_count]
-                    inner_prod = [i[n] * k[n] for n in range(len(i))]
-                    binary_product = sum(inner_prod) % 2
-                    k_plus_j = tuple([(k[m] + j[m]) % 2 for m in range(len(k))])
-                    k_plus_j_index = S.index(k_plus_j)
-                    summand = coeffs[k_count] * coeffs[k_plus_j_index] * ((-1)**binary_product)/(2**N)
-                    GKP += summand
-                GKP = np.abs(GKP)
-        GKP = np.log2(GKP)
-        return GKP
-
     def GKP_Magic(self, psi=None):
         n_qubits = self._QC._n_qubits
         if psi is None:
@@ -304,10 +274,9 @@ class Measurements():
             conv_matrix_1[i_count,:]=(-1)**binary_product
         coeffs= psi.data.toarray()[:,0]
         GKP = 0
-        GKP= np.sum(np.abs(np.dot(coeffs*conv_matrix_0, coeffs[conv_matrix_1] )))/(mag)
+        GKP= np.sum(np.abs(np.dot(coeffs*conv_matrix_0, coeffs[conv_matrix_1])))/(mag)
         GKP = np.log2(GKP)
         return GKP
-
 
 
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True):
