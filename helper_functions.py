@@ -66,4 +66,6 @@ def extend(nested_list):
             l.append(pad_with)
     return np.array(nested_list)
         
-
+def pretty_print_data_dict(data_dict):
+    line1 = f"A {data_dict['N_qubit']} qubit, {data_dict['N_layer']} layer {data_dict['Type']}" 
+    

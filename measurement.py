@@ -263,33 +263,35 @@ class Measurements():
         n_qubits = self._QC._n_qubits
         if psi is None:
             psi = self._QC._quantum_state
-        n_qubits = self._QC._n_qubits
-        mag = 2**self._QC._n_qubits
-        to_index= 2**np.arange(n_qubits)[::-1]
-        conv_matrix_0=np.zeros([mag,mag],dtype=int)
+        mag = 2**n_qubits
         base_states = []
-        for i in list(product([0,1], repeat=n_qubits)):
-            base_states.append(np.array(i[0]))
+        for i in list(product([0, 1], repeat=n_qubits)):
+                base_states.append(np.array(i))
+        to_index = 2**np.arange(n_qubits)[::-1]
+        conv_mat_bp = np.zeros([mag, mag], dtype=int)
+        conv_mat_add_in = np.zeros([mag, mag], dtype=int)
         for j_count in range(mag):
-            base_j=base_states[j_count]
-            k_plus_j=np.mod(base_states+base_j,2)
-            k_plus_j_index=np.sum(k_plus_j*to_index,axis=0)
-            conv_matrix_0[j_count,:]=k_plus_j_index
-        conv_matrix_1=np.zeros([mag,mag],dtype=int)
-        for i_count in range(mag):
-            base_i=base_states[i_count]
-            binary_product=np.mod(np.dot(base_states,base_i),2)
-            conv_matrix_1[i_count,:]=(-1)**binary_product
-        coeffs= psi.data.toarray()[:,0]
+            base_j = base_states[j_count]
+            k_plus_j = np.mod(base_states + base_j, 2)
+            k_plus_j_index = np.sum(k_plus_j * to_index, axis=1)
+            conv_mat_add_in[j_count,:] = k_plus_j_index
+            binary_product = np.mod(np.dot(base_states, base_j), 2)
+            conv_mat_bp[j_count,:] = (-1)**binary_product
+        coeffs = psi.full()[:, 0]
         GKP = 0
-        GKP= np.sum(np.abs(np.dot(coeffs*conv_matrix_0, coeffs[conv_matrix_1])))/(mag)
+        GKP= np.sum(np.abs(np.dot(coeffs * conv_mat_bp, coeffs[conv_mat_add_in]))) / (mag)
         GKP = np.log2(GKP)
         return GKP
 
 
-    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True):
+    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True, full_data=False, angles='random'):
         n = self._QC._n_qubits
-        states = [self._QC.gen_quantum_state() for i in range(sample_N)]
+        if angles == 'clifford':
+            clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
+            init_angles = [[random.choice(clifford_angles) for i in range(self._QC.n_params)] for i in range(sample_N)]
+            states = [self._QC.gen_quantum_state(init) for init in init_angles]
+        else:
+            states = [self._QC.gen_quantum_state() for i in range(sample_N)]
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
         state_pairs = list(combinations(states, r=2))
         overlaps = []
@@ -328,8 +330,11 @@ class Measurements():
                 gkp = self.GKP_Magic(psi)
                 gkps.append(gkp)
             gkp_bar, gkp_std = np.mean(gkps), np.std(gkps)
-
-        return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std], "GKP": [gkp_bar, gkp_std]}
+        
+        if full_data is True:
+            return {"Expr": overlaps, "Ent": q_vals, "Magic": magics, "GKP": gkps}
+        else:
+            return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std], "GKP": [gkp_bar, gkp_std]}
 
     def meyer_wallach(self, sample_N): 
         N = self._QC._n_qubits
@@ -381,6 +386,7 @@ class Measurements():
         diff = 1
         traj = []
         magics = []
+        gkps = []
         ents = []
 
         P_n = self._gen_pauli_group()
@@ -392,6 +398,8 @@ class Measurements():
             traj.append(trajectory)
             entanglement = self._single_Q(self._QC._quantum_state, self._QC._n_qubits)
             ents.append(entanglement)
+            gkp = self.GKP_Magic(psi=self._QC._quantum_state)
+            gkps.append(gkp)
 
         self._QC._quantum_state = self._QC.run(angles=angles)
         trajmaj(angles)
@@ -400,12 +408,6 @@ class Measurements():
             self._QC._quantum_state = self._QC.run(angles=angles)
             prev_energy = self.minimize_function(angles)
             while diff > epsilon and count < quit_iterations:
-
-                #if magic is True:
-                #    eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
-                #    magics.append(eom)
-                
-
                 theta = self._QC.get_params()
                 gradients = self.get_gradient_vector(theta)
 
@@ -425,7 +427,6 @@ class Measurements():
                 trajmaj(theta_update)
                 count += 1
                 prev_energy = energy
-            #print(f"Finished after {count} iterations with cost function = {energy}")
         else:
             if self.minimize_function == self.theta_to_magic:
                 op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
@@ -434,4 +435,4 @@ class Measurements():
                 op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
                                                 method=method, callback=trajmaj, tol=epsilon, jac=self.get_gradient_vector)
             energy = op_out.fun
-        return [energy, traj, magics, ents]
+        return [energy, traj, magics, ents, gkps]

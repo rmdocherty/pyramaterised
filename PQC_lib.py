@@ -407,14 +407,17 @@ class PQC():
         self._n_layers = 0
         self._layers = []
         if n_qubits >= 2:
-            Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
-            Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
-            self.H = Z0 * Z1
+            self.set_H('ZZ')
         self.initial_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
         self._quantum_state = self.initial_state
 
     def set_H(self, H):
-        self.H = H
+        if H == 'ZZ':
+            Z0 = genFockOp(qt.sigmaz(), 0, self._n_qubits, 2)
+            Z1 = genFockOp(qt.sigmaz(), 1, self._n_qubits, 2)
+            self.H = Z0 * Z1
+        else:
+            self.H = H
 
     def set_initial_state(self, state):
         self.initial_state = qt.tensor([state for i in range(self._n_qubits)])

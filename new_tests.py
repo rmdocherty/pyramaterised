@@ -245,6 +245,7 @@ for n in range(2, max_N):
         e = c_c_m.entropy_of_magic()
         entropies.append(e)
         gkp = c_c_m.GKP_Magic()
+        #print(gkp)
         GKPs.append(gkp)
 
 print(f"Entropies of magic are {entropies}, should be roughly 0") #values are ~0 for all so further proff code is working.

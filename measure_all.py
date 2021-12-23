@@ -55,6 +55,16 @@ def generate_circuit(circuit_type, N, p, hamiltonian):
         layers = cs.gen_modified_TFIM_layers(p, N)
     elif circuit_type == "XXZ":
         layers = cs.gen_XXZ_layers(p, N)
+    elif circuit_type == "Circuit_1":
+        layers = cs.circuit_1(p, N)
+    elif circuit_type == "Circuit_2":
+        layers = cs.circuit_2(p, N)
+    elif circuit_type == "Circuit_9":
+        layers = cs.circuit_9(p, N)
+    elif circuit_type == "qg_circuit":
+        layers = cs.qg_circuit(p, N)
+    elif circuit_type == "generic_HE":
+        layers = cs.generic_HE(p, N)
 
     for l in layers:
         circuit.add_layer(l)
@@ -72,34 +82,37 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     random.seed(2)
     circuit_expr = 0
     circuit_entanglement = 0
-    circuit_entanglement_std = 0
     circuit_magic = 0
-    circuit_magic_std = 0
+    circuit_eigvals = []
+    circuit_capped_eigvals = []
+
+    training_final_data = {}
     training_magics = []
     training_entanglement = []
     training_costs = []
     training_fidelities = []
     training_final_states = []
+    training_gkps = []
 
     max_magic = max_magic = np.log((2**n_qubits) + 1) - np.log(2)
-    circuit_metadata = {"Type": circuit_type, "N_qubits": n_qubits, "H": hamiltonian, 
-                        "angles": start, "train": train, "train_method": train_method,
-                        "epsilon": epsilon, "rate": rate, "n_repeats": n_repeats, 
-                        "n_samples": n_samples}
+    circuit_metadata = {"Type": circuit_type, "N_qubits": n_qubits, "N_layers": n_layers,
+                        "H": hamiltonian, "angles": start, "train": train,
+                        "train_method": train_method, "epsilon": epsilon, "rate": rate,
+                        "n_repeats": n_repeats, "n_samples": n_samples}
     circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian)
     circuit_m = Measurements(circuit)
-
-    circuit_data = circuit_m.efficient_measurements(n_samples)
+    if start == "clifford":
+        circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True, angles='clifford')
+    else:
+        circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
     circuit_expr = circuit_data['Expr']
-    circuit_entanglement, circuit_entanglement_std = circuit_data['Ent']
-    circuit_magic, circuit_magic_std = circuit_data['Magic']
-    circuit_GKP, circuit_GKP_std = circuit_data['GKP']
-    circuit_QFI = circuit_m._get_QFI()
-    circuit_eigvals, _ = circuit_m.get_eigenvalues(circuit_QFI)
-    circuit_capped_eigvals = circuit_m.new_measure(circuit_QFI)
+    circuit_entanglement = circuit_data['Ent']
+    circuit_magic = circuit_data['Magic']
+    circuit_GKP = circuit_data['GKP']
     circuit_gradients = []
 
-    for i in range(n_samples):
+    for i in range(n_samples // 20):
+        circuit.set_H('ZZ')
         if start == "random":
             init_angles = [random.random() * 2 * np.pi for i in range(circuit.n_params)]
         elif start == "clifford":
@@ -108,13 +121,19 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
         gradients = circuit_m.get_gradient_vector(init_angles)
         for g in gradients:
             circuit_gradients.append(g)
+        circuit_QFI = circuit_m._get_QFI(grad_list=circuit_m.gradient_list) #should put this in the repeats and save whole array
+        eigvals, _ = circuit_m.get_eigenvalues(circuit_QFI)
+        circuit_eigvals.append(eigvals)
+        circuit_capped_eigvals.append(circuit_m.new_measure(circuit_QFI))
+    circuit_mean_grad = np.mean(circuit_gradients)
     circuit_var_grad = np.var(circuit_gradients)
 
-    circuit_data_dict = {"Expr": circuit_expr, "Ent": circuit_entanglement, "Ent_std": circuit_entanglement_std, 
-                         "Reyni": circuit_magic / max_magic, "Reyni_std": circuit_magic_std / max_magic, 
-                         "GKP": circuit_GKP, "GKP_std": circuit_GKP_std, "Var_grad": circuit_var_grad, "QFIM_e-vals": circuit_eigvals, 
+    circuit.set_H(hamiltonian)
+
+    circuit_data_dict = {"Expr": circuit_expr, "Ent": circuit_entanglement, 
+                         "Reyni": circuit_magic, "GKP": circuit_GKP,
+                         "Gradients": circuit_gradients, "QFIM_e-vals": circuit_eigvals, 
                          "Capped_e-vals": circuit_capped_eigvals}
-    #circuit_std_dict = {"Ent": circuit_entanglement_std, "Reyni": circuit_magic_std / max_magic, "GKP": -1}
 
     if train is True:
         for i in range(n_repeats):
@@ -131,7 +150,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
 
             training_data = circuit_m.train(epsilon=epsilon, rate=rate, method=train_method, angles=init_angles, trajectory=True, magic=True, ent=True)
 
-            value, cost, magic, ent = training_data
+            value, cost, magic, ent, gkp = training_data
             print(f"Training finished on iteration {len(cost)} with cost function = {value}")
 
             if target_state != -1:
@@ -143,28 +162,28 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
             training_costs.append(cost)
             training_magics.append(magic)
             training_entanglement.append(ent)
+            training_gkps.append(gkp)
             circuit_final_state = np.abs(circuit._quantum_state.data.toarray())
             training_final_states.append(circuit_final_state)
 
         training_costs = extend(training_costs)
         training_magics = extend(training_magics)
         training_entanglement = extend(training_entanglement)
-        training_data = {"costs": training_costs, "magics": training_magics, "ents": training_entanglement}
-        mean_magic, std_magic = np.mean(training_magics[:, -1]) / max_magic, np.std(training_magics[:, -1]) / max_magic
-        mean_ent, std_ent = np.mean(training_entanglement[:, -1]), np.std(training_entanglement[:, -1])
-        mean_fidelity, std_fidelities = np.mean(training_fidelities), np.std(training_fidelities)
-        training_final_data = {"Cost_arrs": training_costs, "Ent": mean_ent, "Ent_std": std_ent, "Ent_arrs": training_entanglement , "Reyni": mean_magic, "Reyni_std": std_magic, "Reyni_arrs": training_magics, "GKP": -1, "GKP_std": -1, "Final_states": training_final_states}
+        training_gkps = extend(training_gkps)
+
+        training_final_data = {"Cost": training_costs, "Ent": training_entanglement, "Reyni": training_magics, "GKP": training_gkps, "Final_states": training_final_states}
 
     out_dict = {"Metatdata": circuit_metadata, "Circuit_data": circuit_data_dict, "Training_data": training_final_data}
 
     if save is True:
         file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{train_method}"
-        with open(f'{file_name}.pickle', 'wb') as handle:
+        with open(f'data/{file_name}.pickle', 'wb') as handle:
             pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
+    
+    print(f"Completed circuit {circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}")
     return out_dict
 
 
 #%%
-a = measure_everything("TFIM", 4, 4, 2, 100, HAMILTONIAN, start='random', train_method='BFGS', save=True)
+a = measure_everything("TFIM", 4, 4, 10, 100, HAMILTONIAN, start='random', train_method='BFGS', save=True)
 print(a)

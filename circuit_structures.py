@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov 17 12:19:54 2021
@@ -36,7 +36,7 @@ def gen_clifford_circuit(p, N, method='random'):
         single_qubit_ops = clifford_gates[:2]
         for i in range(p):
             layer = []
-            qs_on = random.sample(qs, k=N//2)
+            qs_on = random.sample(qs, k=N // 2)
             strings = [random.choices(single_qubit_ops, k=LEN_CLIFF_STRING) for i in qs_on]
             #add single qubit clifford strings
             count = 0
@@ -167,3 +167,43 @@ def gen_XXZ_layers(p, N):
         layers.append(layer)
     return layers
 
+
+def circuit_1(p, N):
+    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+def circuit_2(p, N):
+    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+def circuit_9(p, N):
+    layer = [pqc.H(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)] + [pqc.R_x(i, N) for i in range(N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+def qg_circuit(p, N):
+    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer1 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+    layer2 = [pqc.R_x(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+    layer3 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+    layer = layer1 + layer2 + layer3
+    layers = [init_layer] 
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+def generic_HE(p, N):
+    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
+    layers = [init_layer]   
+    for i in range(p):
+        layers.append(layer)
+    return layers
