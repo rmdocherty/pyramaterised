@@ -85,7 +85,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     circuit_magic = 0
     circuit_eigvals = []
     circuit_capped_eigvals = []
-
+    
     training_final_data = {}
     training_magics = []
     training_entanglement = []
@@ -176,14 +176,15 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     out_dict = {"Metatdata": circuit_metadata, "Circuit_data": circuit_data_dict, "Training_data": training_final_data}
 
     if save is True:
-        file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{train_method}"
+        if train is True:
+            file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}_{train_method}"
+        else:
+            file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}"
         with open(f'data/{file_name}.pickle', 'wb') as handle:
             pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
+
     print(f"Completed circuit {circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}")
-    return out_dict
+    return 0 #out_dict
 
 
-#%%
-a = measure_everything("TFIM", 4, 4, 10, 100, HAMILTONIAN, start='random', train_method='BFGS', save=True)
-print(a)
+

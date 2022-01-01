@@ -1,4 +1,4 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov 17 12:19:54 2021
@@ -150,11 +150,11 @@ def TFIM_hamiltonian(N, g, h=0):
 def gen_XXZ_layers(p, N):
     even_indices = []
     odd_indices = []
-    for i in range(N // 2):
+    for i in range((N // 2) - 1):
         even_indices.append((2 * i - 1, 2 * i))
         odd_indices.append((2 * i, 2 * i + 1))
     layers = []
-    for l in p:
+    for l in range(p):
         ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
         YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
         ZZ_2 = [pqc.R_zz((i, j), N) for i, j in even_indices]
@@ -195,7 +195,7 @@ def qg_circuit(p, N):
     layer2 = [pqc.R_x(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
     layer3 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
     layer = layer1 + layer2 + layer3
-    layers = [init_layer] 
+    layers = [init_layer]
     for i in range(p):
         layers.append(layer)
     return layers
@@ -203,7 +203,7 @@ def qg_circuit(p, N):
 def generic_HE(p, N):
     init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layers = [init_layer]   
+    layers = [init_layer] 
     for i in range(p):
         layers.append(layer)
     return layers
