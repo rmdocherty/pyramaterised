@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import random
 import scipy
 import pickle
+import os
+import time
 
 from measurement import Measurements
 from math import isclose
@@ -72,14 +74,17 @@ def generate_circuit(circuit_type, N, p, hamiltonian):
     if hamiltonian == "TFIM":
         ham = cs.TFIM_hamiltonian(N, g=g, h=h)
         circuit.set_H(ham)
-
+            
     return circuit
 
 
 def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                        hamiltonian='ZZ', train=True, start='random', start_angles=[], \
-                           train_method='gradient', epsilon=1e-6, rate=0.001, save=True, plot=True, target_state=-1):
+                           train_method='gradient', epsilon=1e-6, rate=0.001, save=True, plot=True, target_state=-1, train_for="cost"):
     random.seed(2)
+    directory = "magic_optimize_data/"
+    start_time = time.time()
+    
     circuit_expr = 0
     circuit_entanglement = 0
     circuit_magic = 0
@@ -95,16 +100,39 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     training_gkps = []
 
     max_magic = max_magic = np.log((2**n_qubits) + 1) - np.log(2)
+
     circuit_metadata = {"Type": circuit_type, "N_qubits": n_qubits, "N_layers": n_layers,
                         "H": hamiltonian, "angles": start, "train": train,
                         "train_method": train_method, "epsilon": epsilon, "rate": rate,
                         "n_repeats": n_repeats, "n_samples": n_samples}
+
     circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian)
     circuit_m = Measurements(circuit)
+    
+    if train_for == "magic":
+        circuit_m.set_minimise_function(circuit_m.theta_to_magic)
+    elif train_for == "gkp":
+        circuit_m.set_minimise_function(circuit_m.theta_to_gkp)
+    else:
+        pass
+    
     if start == "clifford":
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True, angles='clifford')
     else:
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
+        
+    if train is True:
+        file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}_{train_method}_tf{train_for}"
+    else:
+        file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}"
+
+    fp = f"{directory}{file_name}"
+
+    if os.path.isfile(fp):
+        print("Circuit already measured, skipping.")
+        return 0 #skip if already computed
+
+
     circuit_expr = circuit_data['Expr']
     circuit_entanglement = circuit_data['Ent']
     circuit_magic = circuit_data['Magic']
@@ -137,7 +165,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
 
     if train is True:
         for i in range(n_repeats):
-            print(f"On repeat {i}")
+            #print(f"On repeat {i}")
             circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian)
             circuit_m = Measurements(circuit)
             if start == "random":
@@ -151,7 +179,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
             training_data = circuit_m.train(epsilon=epsilon, rate=rate, method=train_method, angles=init_angles, trajectory=True, magic=True, ent=True)
 
             value, cost, magic, ent, gkp = training_data
-            print(f"Training finished on iteration {len(cost)} with cost function = {value}")
+            #print(f"Training finished on iteration {len(cost)} with cost function = {value}")
 
             if target_state != -1:
                 fidelity = circuit._fidelity(target_state)
@@ -176,14 +204,12 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     out_dict = {"Metatdata": circuit_metadata, "Circuit_data": circuit_data_dict, "Training_data": training_final_data}
 
     if save is True:
-        if train is True:
-            file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}_{train_method}"
-        else:
-            file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}"
-        with open(f'data/{file_name}.pickle', 'wb') as handle:
+        with open(f'{fp}.pickle', 'wb') as handle:
             pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    print(f"Completed circuit {circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}")
+    
+    end = time.time()
+    delta = end - start_time
+    print(f"Completed circuit {file_name} in {delta} seconds")
     return 0 #out_dict
 
 

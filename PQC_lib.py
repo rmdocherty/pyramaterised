@@ -114,6 +114,31 @@ class R_z(PRot):
         self._gate = qt.qip.operations.rz
         self._pauli = qt.sigmaz()
 
+
+#%% Fermionic specific gates
+
+class negative_R_z(R_z):
+    def set_theta(self, theta):
+        self._theta = -1 * theta
+        self._operation = self._set_op()
+
+
+class offset_R_z(R_z):
+    def __init__(self, q_on, q_N, offset):
+        self._q_on = q_on
+        self._q_N = q_N
+        self._theta = 0
+        self._offset = offset 
+        self._is_param = True
+
+        self._set_properties()
+        self._fock = genFockOp(self._pauli, self._q_on, self._q_N, 2)
+        self._operation = self._set_op()
+
+    def set_theta(self, theta):
+        self._theta = theta + self._offset
+        self._operation = self._set_op() 
+
 #%% Fixed angle single-qubit rotations
 
 
@@ -145,6 +170,22 @@ class sqrtH(H):
 
 
 class fixed_R_y(R_y):
+    """Fixed R_y rotation by angle theta. Isn't parameterised and angle can't
+    be changed after initialization."""
+
+    def __init__(self, q_on, q_N, theta):
+        self._q_on = q_on
+        self._q_N = q_N
+        self._theta = theta
+        self._is_param = False
+        self._set_properties()
+        self._operation = self._set_op()
+
+    def set_theta(self, theta):
+        return None
+
+
+class fixed_R_z(R_z):
     """Fixed R_y rotation by angle theta. Isn't parameterised and angle can't
     be changed after initialization."""
 
@@ -215,7 +256,7 @@ class CPHASE(EntGate):
 class sqrtiSWAP(EntGate):
     def _set_op(self):
         gate = qt.qip.operations.sqrtiswap
-        return gate(self._q_N, self._q1, self._q2)
+        return gate(self._q_N, [self._q1, self._q2])
 
 
 class CZ(EntGate):
@@ -270,7 +311,7 @@ class ALLTOALL(EntGate):
 
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
-#%%
+#%% Sharing Parameters
 
 
 class shared_parameter(PRot):
@@ -307,7 +348,7 @@ class shared_parameter(PRot):
         return f"Block of {self._layer}"
 
 
-#%% 2 qubit rotation gates⎜⎜
+#%% 2 qubit rotation gates
 
 #big question - should the second qubit angle be -1 * theta ???
 
@@ -394,6 +435,19 @@ class RR_block(shared_parameter):
 
     def __repr__(self):
         return f"RR block of {self._layer}"
+    
+    
+def fsim_gate(theta, phi, N=None, control=0, target=1):
+    if (control == 1 and target == 0) and N is None:
+        N = 2
+
+    if N is not None:
+        return qt.qip.operations.gate_expand_2toN(fsim_gate(theta, phi), N, control, target)
+    return qt.Qobj([[1,                   0,                   0,                  0],
+                    [0,       np.cos(theta), -1j * np.sin(theta),                  0],
+                    [0, -1j * np.sin(theta),       np.cos(theta),                  0],
+                    [0,                   0,                   0, np.exp(-1j * phi)]],
+                    dims=[[2, 2], [2, 2]])
 
 #%% =============================CIRCUIT=============================
 

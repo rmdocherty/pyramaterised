@@ -12,6 +12,9 @@ import random
 from measurement import Measurements
 from helper_functions import genFockOp
 
+
+
+# ============================== HE CIRCUITS ==============================
 LEN_CLIFF_STRING = 3
 
 
@@ -94,7 +97,6 @@ def NPQC_layers(p, N):
         layers.append(p_layer)
     return layers, angles
 
-
 def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
     layers_to_add = [circuit.get_layer(i) for i in layer_index_list]
     prev_rank, rank_diff = 0, 1
@@ -111,6 +113,73 @@ def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
         prev_rank = rank
         count += 1
     return count
+
+
+def string_to_entangler(string):
+    lower = string.lower()
+    if lower == "cnot":
+        entangler = pqc.CNOT
+    elif lower == "cphase":
+        entangler = pqc.CPHASE
+    elif lower == "cz":
+        entangler = pqc.CZ
+    elif lower == "sqrtiswap":
+        entangler = pqc.sqrtiSWAP
+    else:
+        raise Exception("Must supply a valid entangler!")
+    return entangler
+
+
+def circuit_1(p, N):
+    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+
+def circuit_2(p, N, ent_str="cnot"):
+    entangler = string_to_entangler(ent_str)
+    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+
+def circuit_9(p, N, ent_str="cphase"):
+    entangler = string_to_entangler(ent_str)
+    layer = [pqc.H(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)] + [pqc.R_x(i, N) for i in range(N)]
+    layers = []
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+
+def qg_circuit(p, N, ent_str="cnot"):
+    entangler = string_to_entangler(ent_str)
+    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer1 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layer2 = [pqc.R_x(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layer3 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layer = layer1 + layer2 + layer3
+    layers = [init_layer]
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+
+def generic_HE(p, N, ent_str="cnot"):
+    entangler = string_to_entangler(ent_str)
+    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layers = [init_layer] 
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
+
+# ============================== PROBLEM INPSIRED CIRCUITS ==============================
 
 
 def gen_TFIM_layers(p, N):
@@ -168,42 +237,44 @@ def gen_XXZ_layers(p, N):
     return layers
 
 
-def circuit_1(p, N):
-    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)]
+def gen_theta_block(q1, q2, N):
+    block = []
+    block.append(pqc.sqrtiSWAP([q1, q2], N))
+
+    minus_rot = pqc.negative_R_z(q1, N)
+    offset_rot = pqc.offset_R_z(q2, N, np.pi)
+    shared_param = pqc.shared_parameter([minus_rot, offset_rot], N)
+    block.append(shared_param)
+
+    block.append(pqc.sqrtiSWAP([q1, q2], N))
+
+    fixed = pqc.fixed_R_z(q2, N, np.pi)
+    block.append(fixed)
+    return block
+
+
+def list_to_pairs(x):
+    pairs = [(x[i], x[i + 1]) for i in range(0, len(x) - 1, 2)]
+    return pairs
+
+
+def gen_fermionic_circuit(N):
+    blocks = []
     layers = []
-    for i in range(p):
+    for n in range(1, 1 + N // 2):
+        first_half = [i for i in np.arange(N // 2, N // 2 - n, -1)]
+        first_half.reverse()
+        snd_half = [i for i in np.arange(1 + N // 2, 1 + N // 2 + n, 1)]
+        combined = first_half + snd_half
+        pairs = list_to_pairs(combined)
+        blocks.append(pairs)
+    rev = list(reversed(blocks))[1:]
+    blocks = blocks + rev # symmetry
+    for b in blocks:
+        layer = []
+        for x in b:
+            block = gen_theta_block(x[0] - 1, x[1] - 1, N) #-1 to go from indices -> qubits
+            layer.append(block)
         layers.append(layer)
     return layers
-
-def circuit_2(p, N):
-    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layers = []
-    for i in range(p):
-        layers.append(layer)
-    return layers
-
-def circuit_9(p, N):
-    layer = [pqc.H(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)] + [pqc.R_x(i, N) for i in range(N)]
-    layers = []
-    for i in range(p):
-        layers.append(layer)
-    return layers
-
-def qg_circuit(p, N):
-    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-    layer1 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layer2 = [pqc.R_x(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layer3 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layer = layer1 + layer2 + layer3
-    layers = [init_layer]
-    for i in range(p):
-        layers.append(layer)
-    return layers
-
-def generic_HE(p, N):
-    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CNOT, N)]
-    layers = [init_layer] 
-    for i in range(p):
-        layers.append(layer)
-    return layers
+        

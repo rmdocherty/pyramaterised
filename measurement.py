@@ -282,6 +282,12 @@ class Measurements():
         GKP= np.sum(np.abs(np.dot(coeffs * conv_mat_bp, coeffs[conv_mat_add_in]))) / (mag)
         GKP = np.log2(GKP)
         return GKP
+    
+    def theta_to_gkp(self, theta):
+        QC = self._QC
+        QC._quantum_state = QC.run(angles=theta)
+        gkp = self.GKP_Magic(QC._quantum_state)
+        return -1 * gkp # -1 so we can minize easily
 
 
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True, full_data=False, angles='random'):
