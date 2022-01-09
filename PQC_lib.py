@@ -172,6 +172,12 @@ class sqrtH(H):
         self._gate = ops.ry
         return np.sqrt(ops.x_gate(self._q_N, self._q_on) * self._gate(np.pi / 2, N=self._q_N, target=self._q_on))
 
+class X(H):
+    def _set_op(self):
+        """Pauli X gate"""
+        ops = qt.qip.operations
+        return ops.x_gate(self._q_N, self._q_on)
+
 
 class fixed_R_y(R_y):
     """Fixed R_y rotation by angle theta. Isn't parameterised and angle can't

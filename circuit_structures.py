@@ -219,10 +219,16 @@ def TFIM_hamiltonian(N, g, h=0):
 def gen_XXZ_layers(p, N):
     even_indices = []
     odd_indices = []
-    for i in range((N // 2) - 1):
-        even_indices.append((2 * i - 1, 2 * i))
-        odd_indices.append((2 * i, 2 * i + 1))
-    layers = []
+    for i in range(1, (N // 2) + 1): # -1 to convert from 1 indexed paper defn to 0 indexed qubit lists
+        even_bot, even_top = (2 * i - 1) - 1, (2 * i) - 1
+        even_indices.append((even_bot, even_top))
+        odd_bot, odd_top = (2 * i) - 1, ((2 * i + 1) - 1) % N #need mod N here
+        odd_indices.append((odd_bot, odd_top))
+
+    init_x_bits = [pqc.X(i, N) for i in range(N)]
+    init_H = [pqc.H(i, N) for i in range(N) if i % 2 == 0] #H on even links
+    init_CNOT = [pqc.CNOT([i, j], N) for i, j in even_indices]
+    layers = [[init_x_bits, init_H, init_CNOT]]
     for l in range(p):
         ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
         YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
@@ -279,4 +285,5 @@ def gen_fermionic_circuit(N):
     return layers
 
 
-#a = gen_XXZ_layers(4, 4)
+a = gen_XXZ_layers(4, 4)
+print(a)
