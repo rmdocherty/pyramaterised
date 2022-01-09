@@ -466,7 +466,7 @@ def fsim_gate_d_theta(theta, phi, N=None, control=0, target=1):
         N = 2
 
     if N is not None:
-        return qt.qip.operations.gate_expand_2toN(fsim_gate(theta, phi), N, control, target)
+        return qt.qip.operations.gate_expand_2toN(fsim_gate_d_theta(theta, phi), N, control, target)
     return qt.Qobj([[1,                   0,                   0,                  0],
                     [0,       -1 * np.sin(theta), 1j * np.cos(theta),                  0],
                     [0, 1j * np.cos(theta),      -1 *  np.sin(theta),                  0],
@@ -478,7 +478,7 @@ def fsim_gate_d_phi(theta, phi, N=None, control=0, target=1):
         N = 2
 
     if N is not None:
-        return qt.qip.operations.gate_expand_2toN(fsim_gate(theta, phi), N, control, target)
+        return qt.qip.operations.gate_expand_2toN(fsim_gate_d_phi(theta, phi), N, control, target)
     return qt.Qobj([[1,                   0,                   0,                  0],
                     [0,       np.cos(theta), -1j * np.sin(theta),                  0],
                     [0, -1j * np.sin(theta),       np.cos(theta),                  0],
