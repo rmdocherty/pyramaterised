@@ -64,6 +64,7 @@ class PRot(Gate):
         self._q_N = q_N
         self._theta = 0
         self._is_param = True
+        self._param_count = 1
 
         self._set_properties()
         self._fock = genFockOp(self._pauli, self._q_on, self._q_N, 2)
@@ -130,6 +131,8 @@ class offset_R_z(R_z):
         self._theta = 0
         self._offset = offset 
         self._is_param = True
+        self._param_count = 1
+
 
         self._set_properties()
         self._fock = genFockOp(self._pauli, self._q_on, self._q_N, 2)
@@ -150,6 +153,7 @@ class H(PRot):
         self._q_N = q_N
         self._theta = np.pi / 2
         self._is_param = False
+        self._param_count = 0
         self._operation = self._set_op()
 
     def set_theta(self, angle):
@@ -178,6 +182,7 @@ class fixed_R_y(R_y):
         self._q_N = q_N
         self._theta = theta
         self._is_param = False
+        self._param_count = 0
         self._set_properties()
         self._operation = self._set_op()
 
@@ -194,6 +199,7 @@ class fixed_R_z(R_z):
         self._q_N = q_N
         self._theta = theta
         self._is_param = False
+        self._param_count = 0
         self._set_properties()
         self._operation = self._set_op()
 
@@ -230,6 +236,7 @@ class EntGate(Gate):
         self._q1, self._q2 = qs_on[0], qs_on[1]
         self._q_N = q_N
         self._is_param = False
+        self._param_count = 0
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -276,6 +283,7 @@ class CHAIN(EntGate):
         self._entangler = entangler
         self._q_N = q_N
         self._is_param = False
+        self._param_count = 0
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -297,6 +305,7 @@ class ALLTOALL(EntGate):
         self._entangler = entangler
         self._q_N = q_N
         self._is_param = False
+        self._param_count = 0
         self._operation = self._set_op()
 
     def _set_op(self):
@@ -320,6 +329,7 @@ class shared_parameter(PRot):
         self._theta = 0
         self._q_N = q_N
         self._is_param = True
+        self._param_count = 1
         self._operation = self._set_op()
 
     def derivative(self):
@@ -359,6 +369,7 @@ class RR(PRot):
         self._q_N = q_N
         self._theta = 0
         self._is_param = True
+        self._param_count = 1
         self._set_properties()
         #self._fock1 = genFockOp(self._pauli, self._q1, self._q_N, 2)
         #self._fock2 = genFockOp(self._pauli, self._q2, self._q_N, 2)
@@ -410,6 +421,7 @@ class RR_block(shared_parameter):
         self._theta = 0
         self._q_N = q_N
         self._is_param = True
+        self._param_count = 1
         self._layer = self.gen_layer()
         self._operation = self._set_op()
     
@@ -449,11 +461,75 @@ def fsim_gate(theta, phi, N=None, control=0, target=1):
                     [0,                   0,                   0, np.exp(-1j * phi)]],
                     dims=[[2, 2], [2, 2]])
 
+def fsim_gate_d_theta(theta, phi, N=None, control=0, target=1):
+    if (control == 1 and target == 0) and N is None:
+        N = 2
+
+    if N is not None:
+        return qt.qip.operations.gate_expand_2toN(fsim_gate(theta, phi), N, control, target)
+    return qt.Qobj([[1,                   0,                   0,                  0],
+                    [0,       -1 * np.sin(theta), 1j * np.cos(theta),                  0],
+                    [0, 1j * np.cos(theta),      -1 *  np.sin(theta),                  0],
+                    [0,                   0,                   0, np.exp(-1j * phi)]],
+                    dims=[[2, 2], [2, 2]])
+
+def fsim_gate_d_phi(theta, phi, N=None, control=0, target=1):
+    if (control == 1 and target == 0) and N is None:
+        N = 2
+
+    if N is not None:
+        return qt.qip.operations.gate_expand_2toN(fsim_gate(theta, phi), N, control, target)
+    return qt.Qobj([[1,                   0,                   0,                  0],
+                    [0,       np.cos(theta), -1j * np.sin(theta),                  0],
+                    [0, -1j * np.sin(theta),       np.cos(theta),                  0],
+                    [0,                   0,                   0, -1j * np.exp(-1j * phi)]],
+                    dims=[[2, 2], [2, 2]])
+
+class fSim(PRot):
+    def __init__(self, qs_on, q_N):
+        self._q1, self._q2 = qs_on
+        self._q_N = q_N
+        self._theta = 0
+        self._phi = 0
+        self._is_param = True
+        self._param_count = 2
+
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        return fsim_gate(self._theta, self._phi, N=self._q_N, control=self._q1, target=self._q2)
+
+    def set_theta(self, theta):
+        self._theta = theta
+        self._operation = self._set_op()
+
+    def set_phi(self, phi):
+        self._phi = phi
+        self._operation = self._set_op()
+
+    def derivative(self, param):
+        if param == 1: #i.e d_theta
+            deriv = fsim_gate_d_theta(self._theta, self._phi, N=self._q_N, control=self._q1, target=self._q2)
+        elif param == 2: #i.e d_phi
+            deriv = fsim_gate_d_phi(self._theta, self._phi, N=self._q_N, control=self._q1, target=self._q2)
+        return deriv
+
+    def flip_pauli(self):
+        pass
+
+    def __repr__(self):
+        name = type(self).__name__
+        angle1 = self._theta
+        angle2 = self._phi
+        string = f"{name}({angle1:.2f},{angle2:.2f})@q{self._q1, self._q2}"
+        return string
+
+
 #%% =============================CIRCUIT=============================
 
 
 class PQC():
-    """A class to define an n qubit wide, n layer deep Parameterised Quantum
+    """A class to define an n qubit wide, p layer deep Parameterised Quantum
     Circuit."""
 
     def __init__(self, n_qubits):
@@ -503,27 +579,48 @@ class PQC():
         self._parameterised = []
         param_count = 0
         for gate in self.gates:
-            if gate._is_param:
-                self._parameterised.append(param_count)
+            param_count += gate._param_count
+            for i in range(gate._param_count):
                 param_count += 1
+                self._parameterised.append(param_count)
             else:
                 self._parameterised.append(-1)
         self.n_params = len([i for i in self._parameterised if i > -1])
 
     def get_params(self):
-        angles = [g._theta for g in self.gates if g._is_param]
+        angles = []
+        for g in self.gates:
+            if g._param_count == 2:
+                angles.append(g._theta)
+                angles.append(g._phi)
+            elif g._param_count == 1:
+                angles.append(g._theta)
         return angles
 
     def set_params(self, angles=[]):
         """Set the parameters of every parameterised gate (i.e inherits from PRot)
         in the circuit. Can set either randomly or from a specified list"""
         parameterised = [g for g in self.gates if g._is_param]
-        for count, p in enumerate(parameterised):
-            if angles != []:
-                angle = angles[count]
-            else: #use random params
-                angle = rng.random(1)[0] * 2 * np.pi
-            p.set_theta(angle)
+        param_counter = 0
+        for g in parameterised:
+            if g._param_count == 2:
+                if angles != []:
+                    angle1 = angles[param_counter]
+                    angle2 = angles[param_counter + 1]
+                else: #use random params
+                    angle1 = rng.random(1)[0] * 2 * np.pi
+                    angle2 = rng.random(1)[0] * 2 * np.pi
+                g.set_theta(angle1)
+                g.set_phi(angle2)
+                param_counter += 2
+
+            elif g._param_count == 1:
+                if angles != []:
+                    angle1 = angles[param_counter]
+                else: #use random params
+                    angle1 = rng.random(1)[0] * 2 * np.pi
+                g.set_theta(angle1)
+                param_counter += 1
 
     def run(self, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
@@ -558,34 +655,42 @@ class PQC():
         for g in parameterised:
             g.flip_pauli()
 
-    def take_derivative(self, g_on):
+    def take_derivative(self, g_on, param=0):
         """Get the derivative of the ith parameter of the circuit and return
         the circuit where the ith gate is multiplied by its derivative."""
         #need to find which gate the ith parameterised gate is
-        p_loc = self._parameterised.index(g_on)
-        gates = self.gates
+        g_loc = self.gates.index(g_on) 
         #copy so don't overwrite later - much better than deepcopying whole circuit!
-        gate = copy(gates[p_loc])
+        gate = copy(self.gates[g_loc])
         #find the derivative using the gate's derivative method
-        deriv = gate.derivative()
+        if param == 0:
+            deriv = gate.derivative()
+        else: #find ith deriv for multi parameterised gates
+            deriv = gate.derivative(param)
         #set pth gate to be deriv * gate
-        gates[p_loc] = deriv * gate
+        self.gates[g_loc] = deriv * gate
         #act the derivative of circuit on |0>
         circuit_state = self.initial_state
-        for g in gates:
+        for g in self.gates:
             circuit_state = g * circuit_state
         #reset the gate back to what it was originally
-        gates[p_loc] = gate
+        self.gates[g_loc] = gate
         return circuit_state
 
     def get_gradients(self):
         """Get the n_params circuits with the ith derivative multiplied in and
         then apply them to the basis state."""
         gradient_state_list = []
-        n_params = len([i for i in self._parameterised if i > -1])
-        for i in range(n_params):
-            gradient = self.take_derivative(i)
-            gradient_state_list.append(gradient)
+        parameterised = [i for i in self.gates if i._param_count > 0]
+        for g in parameterised:
+            if g._param_count == 1:
+                gradient = self.take_derivative(g)
+                gradient_state_list.append(gradient)
+            elif g._param_count == 2:
+                gradient1 = self.take_derivative(g, param=1)
+                gradient2 = self.take_derivative(g, param=2)
+                gradient_state_list.append(gradient1)
+                gradient_state_list.append(gradient2)
         return gradient_state_list
 
     def __repr__(self):

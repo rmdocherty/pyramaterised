@@ -138,7 +138,7 @@ print(f"Circuit 11 expr for {L} layers is  {c11_out['Expr']}")
 
 #%% =============================QUANTUM GEOMETRY CIRCUIT TESTS=============================
 """Tests based on default circuit in arXiv:2102.01659v1 github"""
-qg_circuit = pqc.PQC(8)
+qg_circuit = pqc.PQC(4)
 init_layer = [pqc.fixed_R_y(i, 4, np.pi / 4) for i in range(4)]
 layer1 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_z(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
 layer2 = [pqc.R_x(0, 4), pqc.R_x(1, 4), pqc.R_x(2, 4), pqc.R_y(3, 4), pqc.CHAIN(pqc.CNOT, 4)]
@@ -148,7 +148,7 @@ layer3 = [pqc.R_z(0, 4), pqc.R_x(1, 4), pqc.R_y(2, 4), pqc.R_y(3, 4), pqc.CHAIN(
 qg_circuit.add_layer(init_layer)
 qg_circuit.add_layer(layer1)
 qg_circuit.add_layer(layer2)
-qg_circuit.add_layer(layer3, n=8)
+qg_circuit.add_layer(layer3, n=1)
 
 qg_circuit.gen_quantum_state()
 default_angles = [
@@ -164,7 +164,7 @@ default_angles = [
 qg_circuit._quantum_state = qt.Qobj(qg_circuit.run())
 print(qg_circuit)
 
-#energy = qg_circuit.cost(default_angles)
+energy = qg_circuit.cost(default_angles)
 
 print(f"Energy is {energy}, should be 0.46135870050914374")
 qg_m = Measurements(qg_circuit)
@@ -192,7 +192,7 @@ plt.plot(iterations, np.array(out[2]) / (np.log((2**N) + 1) - np.log(2)), lw=4)
 
 print(np.abs(qg_circuit._quantum_state.data.toarray()))
 
-pretty_graph("Iterations", "Cost function", "Cost function vs iterations for overparameterised PQC", 20)
+pretty_graph("Iterations", "Cost function", "Fractional Magic vs iterations for overparameterised PQC", 20)
 
 
 """Lowest we've recorded is -0.69589... but there is massive variance"""
