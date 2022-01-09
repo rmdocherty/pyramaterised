@@ -302,7 +302,7 @@ class Measurements():
         state_pairs = list(combinations(states, r=2))
         overlaps = []
 
-        if expr:
+        if expr and n < 7:
             for psi, phi in state_pairs:
                 F = np.abs(psi.overlap(phi))**2
                 overlaps.append(F)
@@ -323,20 +323,22 @@ class Measurements():
         else:
             q, std = -1, -1
 
-        if eom:
+        if eom and n < 9:
             for psi in states:
                 entropy_of_magic = self.entropy_of_magic(psi, P_n)
                 magics.append(entropy_of_magic)
             magic_bar, magic_std = np.mean(magics), np.std(magics)
         else:
-            magic_bar, magic_std = 0, 0
+            magic_bar, magic_std = -1, -1
 
         if GKP:
             for psi in states:
                 gkp = self.GKP_Magic(psi)
                 gkps.append(gkp)
             gkp_bar, gkp_std = np.mean(gkps), np.std(gkps)
-        
+        else:
+            gkp_bar, gkp_std = -1, -1
+
         if full_data is True:
             return {"Expr": overlaps, "Ent": q_vals, "Magic": magics, "GKP": gkps}
         else:
