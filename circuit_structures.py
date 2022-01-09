@@ -283,7 +283,3 @@ def gen_fermionic_circuit(N):
             layer.append(block)
         layers.append(layer)
     return layers
-
-
-a = gen_XXZ_layers(4, 4)
-print(a)
