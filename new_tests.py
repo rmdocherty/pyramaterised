@@ -180,11 +180,11 @@ print(f"Magic is {entropy[0]} +/- {entropy[1]}")
 #%% 
 """Tested with the fixed angles as initial params and took 3539 iteraions = 1m42s
  to 1e-6 accuracy and cost function is 0.34583907096349875"""
-qg_m.set_minimise_function(qg_m.theta_to_magic)
-out = qg_m.train(rate=0.01, method="BFGS", angles=[random.random() * 2 * np.pi for i in range(12)])
+#qg_m.set_minimise_function(qg_m.theta_to_magic)
+out = qg_m.train(rate=0.001, method="BFGS", angles=[random.random() * 2 * np.pi for i in range(12)])
 
 print(out)
-print(qg_circuit)
+#print(qg_circuit)
 
 #%%
 iterations = range(len(out[2]))
@@ -355,7 +355,7 @@ for l in layers:
 
 NPQC_m = Measurements(NPQC)
 #%%
-out = NPQC_m.train(rate=0.01, epsilon=1e-6)
+out = NPQC_m.train(rate=0.01, epsilon=1e-6, method="bfgs")
 
 
 #%%
@@ -377,8 +377,10 @@ op = find_overparam_point(test, [0])
 print(f"Test circuit overparameterised after {op} layesr added")
 #%%
 test_m = Measurements(test)
-ener, traj, *others = test_m.train(trajectory=True, rate=0.01)
-
+random_angles = [random.random()*np.pi for i in range(4 * len(test._layers))]
+ener, traj, *others = test_m.train(trajectory=True, rate=0.01, verbose=True, method="BFGS", magic=True, angles=random_angles)
+print(ener)
+print(traj)
 
 iterations = range(len(traj))
 plt.plot(iterations, traj, lw=4)
@@ -390,7 +392,7 @@ pretty_graph("Iterations", "Cost function", "Cost function vs iterations for ove
 Test TFIM overparameterisation values for different N.
 """
 
-N, p = 8, 7
+N, p = 4, 4
 g_0, h_0 = 1, 0
 
 TFIM = pqc.PQC(N)
@@ -416,9 +418,9 @@ random_angles = [random.random()*np.pi for i in range(2*p)]
 clifford_angles = [0 for i in range(2*p)]
 
 TFIM_m = Measurements(TFIM)
-TFIM_m.set_minimise_function(TFIM_m.theta_to_magic)
+#TFIM_m.set_minimise_function(TFIM_m.theta_to_magic)
 print(TFIM_m.minimize_function)
-out = TFIM_m.train(method='BFGS', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True)
+out = TFIM_m.train(method='gradient', rate=0.001, epsilon=1e-6, angles=random_angles, magic=True, trajectory=True, verbose=True)
 
 grad_min = out[0]
 
