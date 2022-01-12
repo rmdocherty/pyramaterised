@@ -283,3 +283,19 @@ def gen_fermionic_circuit(N):
             layer.append(block)
         layers.append(layer)
     return layers
+
+
+def gen_fSim_circuit(p, N, rotator='y'):
+    r = rotator.lower()
+    if r == 'y':
+        rot_gate = pqc.R_y
+    elif r == 'x':
+        rot_gate = pqc.R_x
+    elif r == 'z':
+        rot_gate = pqc.R_z
+    else:
+        raise Exception("Please supply a valid single qubit rotator")
+    layers = []
+    for l in range(p):
+        layer = []
+        rotations = [rot_gate(i, N) for i in range(N)]

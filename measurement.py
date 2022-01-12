@@ -441,6 +441,6 @@ class Measurements():
                                                 method=method, args=[P_n], callback=trajmaj, tol=epsilon)
             else:
                 op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
-                                                method=method, callback=trajmaj, tol=epsilon, jac=self.get_gradient_vector)
+                                             method=method, callback=trajmaj, tol=epsilon)
             energy = op_out.fun
         return [energy, traj, magics, ents, gkps]
