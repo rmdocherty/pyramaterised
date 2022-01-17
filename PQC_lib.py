@@ -122,6 +122,10 @@ class negative_R_z(R_z):
     def set_theta(self, theta):
         self._theta = -1 * theta
         self._operation = self._set_op()
+    
+    def derivative(self): #as -theta in expo need to change derivative sign
+        deriv = 1j * self._fock / 2
+        return deriv
 
 
 class offset_R_z(R_z):
@@ -591,7 +595,7 @@ class PQC():
                 self._parameterised.append(param_count)
             else:
                 self._parameterised.append(-1)
-        self.n_params = len([i for i in self._parameterised if i > -1])
+        self.n_params = param_count
 
     def get_params(self):
         angles = []
@@ -688,13 +692,14 @@ class PQC():
         then apply them to the basis state."""
         gradient_state_list = []
         parameterised = [i for i in self.gates if i._param_count > 0]
-        for g in parameterised:
+        for count, g in enumerate(parameterised):
             if g._param_count == 1:
                 gradient = self.take_derivative(g)
                 gradient_state_list.append(gradient)
             elif g._param_count == 2:
-                gradient1 = self.take_derivative(g, param=1)
-                gradient2 = self.take_derivative(g, param=2)
+                gradient1 = self.take_derivative(g, param=1) 
+                g_prime = self.gates[count] # copy op in take deriv changes ref of ith gate so need to 'find' it again
+                gradient2 = self.take_derivative(g_prime, param=2)
                 gradient_state_list.append(gradient1)
                 gradient_state_list.append(gradient2)
         return gradient_state_list

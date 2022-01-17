@@ -378,7 +378,7 @@ print(f"Test circuit overparameterised after {op} layesr added")
 #%%
 test_m = Measurements(test)
 random_angles = [random.random()*np.pi for i in range(4 * len(test._layers))]
-ener, traj, *others = test_m.train(trajectory=True, rate=0.01, verbose=True, method="BFGS", magic=True, angles=random_angles)
+ener, traj, *others = test_m.train(trajectory=True, rate=0.01, verbose=True, method="BFGS", magic=True)
 print(ener)
 print(traj)
 

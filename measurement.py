@@ -114,7 +114,7 @@ class Measurements():
             F: List of floats, 0 < f < 1 that are fidelity midpoints,
         """
         #bin no. = 75 from paper
-        prob, edges = np.histogram(F_samples, bins=75, range=(0, 1))
+        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1))
         prob = prob / sum(prob) #normalise by sum of prob or length?
         #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
@@ -126,7 +126,7 @@ class Measurements():
         haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
         P_haar = haar / sum(haar) #do i need to normalise this?
 
-        expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
+        expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         return expr
 
     def expressibility(self, sample_N, graphs=False):

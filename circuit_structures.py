@@ -228,7 +228,7 @@ def gen_XXZ_layers(p, N):
     init_x_bits = [pqc.X(i, N) for i in range(N)]
     init_H = [pqc.H(i, N) for i in range(N) if i % 2 == 0] #H on even links
     init_CNOT = [pqc.CNOT([i, j], N) for i, j in even_indices]
-    layers = [[init_x_bits, init_H, init_CNOT]]
+    layers = [init_x_bits, init_H, init_CNOT]
     for l in range(p):
         ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
         YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
@@ -264,23 +264,26 @@ def list_to_pairs(x):
     return pairs
 
 
-def gen_fermionic_circuit(N):
-    blocks = []
+def gen_fermionic_circuit(p, N):
     layers = []
-    for n in range(1, 1 + N // 2):
-        first_half = [i for i in np.arange(N // 2, N // 2 - n, -1)]
-        first_half.reverse()
-        snd_half = [i for i in np.arange(1 + N // 2, 1 + N // 2 + n, 1)]
-        combined = first_half + snd_half
-        pairs = list_to_pairs(combined)
-        blocks.append(pairs)
-    rev = list(reversed(blocks))[1:]
-    blocks = blocks + rev # symmetry
-    for b in blocks:
+    for j in range(p):
+        blocks = []
         layer = []
-        for x in b:
-            block = gen_theta_block(x[0] - 1, x[1] - 1, N) #-1 to go from indices -> qubits
-            layer.append(block)
+        for n in range(1, 1 + N // 2):
+            first_half = [i for i in np.arange(N // 2, N // 2 - n, -1)]
+            first_half.reverse()
+            snd_half = [i for i in np.arange(1 + N // 2, 1 + N // 2 + n, 1)]
+            combined = first_half + snd_half
+            pairs = list_to_pairs(combined)
+            blocks.append(pairs)
+        rev = list(reversed(blocks))[1:]
+        blocks = blocks + rev # symmetry
+        for b in blocks:
+            layer = []
+            for x in b:
+                block = gen_theta_block(x[0] - 1, x[1] - 1, N) #-1 to go from indices -> qubits
+                for bl in block:
+                    layer.append(bl)
         layers.append(layer)
     return layers
 
@@ -299,3 +302,35 @@ def gen_fSim_circuit(p, N, rotator='y'):
     for l in range(p):
         layer = []
         rotations = [rot_gate(i, N) for i in range(N)]
+        if N % 2 == 0:
+            offset = l % 2
+            for i in range(offset, N, 2):
+                layer.append(pqc.fSim([i, (i+1)%N], N))
+        else:
+            offset = l % N
+            pairs = []
+            indices = [i for i in range(N)]
+            indices.pop(offset)
+            if 0 in indices and 1 in indices:
+                pairs.append((0,1))
+                indices.pop(1)
+                indices.pop(0)
+            elif 0 in indices and N - 1 in indices:
+                pairs.append((0, N - 1))
+                indices.pop(N-1)
+                indices.pop(0)
+            for i in range(len(indices)):
+                in_pairs = False
+                for p in pairs:
+                    if indices[i] in p or indices[i+1] in p:
+                        in_pairs = True
+                if in_pairs is False:
+                    pairs.append((indices[i], indices[i+1]))
+                    indices.pop(i)
+                    indices.pop(i % N) #after popping i, i+1 th elem is now ith elem
+
+            layer.append(rot_gate(offset, N))
+            for p in pairs:
+                layer.append(pqc.fSim([p[0], p[1]], N))
+        layers.append(layer)
+    return layers
