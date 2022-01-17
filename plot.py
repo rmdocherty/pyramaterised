@@ -8,11 +8,37 @@ Created on Fri Jan 14 13:49:13 2022
 import pickle
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import qutip as qt
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from helper_functions import pretty_graph
 from measurement import Measurements
 from PQC_lib import PQC
 import numpy as np
+
+#%%
+class Haar():
+    def __init__(self, N):
+        self._n_qubits = N
+        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        haar = qt.random_objects.rand_unitary_haar(2**N, [[2 for i in range(N)], [2 for i in range(N)]])
+        self._quantum_state = haar * circuit_state
+
+    def gen_quantum_state(self):
+        N = self._n_qubits
+        circuit_state = qt.tensor([qt.basis(2, 0) for i in range(self._n_qubits)])
+        haar = qt.random_objects.rand_unitary_haar(2**N, [[2 for i in range(N)], [2 for i in range(N)]])
+        self._quantum_state = haar * circuit_state
+        return self._quantum_state
+    
+    def cost(self):
+        return None
+
+haars = []
+for i in range(2,10):
+    haar = Haar(i)
+    haar_m = Measurements(haar)
+    magic = haar_m.efficient_measurements(100, expr=False, ent=False, eom=False, GKP=True)
+    haars.append(magic['GKP'])
 
 #%%
 
@@ -35,7 +61,7 @@ for circuit_type in circuit_data.keys():
 #%%
 markers = {"TFIM": 'p', "XXZ": 'x', "generic_HE": 'h', "fsim": 'o', "fermionic": 's', "Circuit_9": '$9$', "qg_circuit": '^'}
 colours = {"TFIM": "#5ADBFF", "XXZ": "#235789", "generic_HE": "#C1292E", "fsim": "#F1D302", "fermionic": "#E9BCB7", "qg_circuit": "#139A43", "Circuit_9": "#FF8552"}
-label_dict = {"Expr": "Expressibility", "Ent": "Entanglement", "Reyni": "Fractional Reyni Entropy of Magic", "GKP": "GKP Magic", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}"}
+label_dict = {"Expr": "Expressibility", "Ent": "Entanglement", "Reyni": "Reyni Magic relative to Haar random magic", "GKP": "GKP Magic relative to Haar random magic", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}"}
 
 def quantity_vs_depth(circuit, quantity, N):
     index_n = N - 2
@@ -56,12 +82,19 @@ def quantity_vs_depth(circuit, quantity, N):
             avg = np.var(grad_list)
             std = 0
         elif quantity == "Reyni":
-            max_magic = np.log((2**N) + 1) - np.log(2)
-            avg = np.mean(val) / max_magic
-            std = np.std(val) / max_magic
+            haar_m = avg_magic = np.log(3 + 2**N) - np.log(4)
+            #max_magic = np.log((2**N) + 1) - np.log(2)
+            avg = np.mean(val) / haar_m # max_magic
+            std = np.std(val) / haar_m #max_magic
+        elif quantity == "GKP":
+            haar_m = haars[index_n][0]
+            #max_magic = np.log((2**count) + 1) - np.log(2)
+            avg = np.mean(val) / haar_m #max_magic
+            std = np.std(val) / haar_m #max_magic
         else:
             avg = np.mean(val)
             std = np.std(val)
+        
         values.append(avg)
         depths.append(count)
         stds.append(std)
@@ -76,10 +109,9 @@ def quantity_vs_N(circuit, quantity, depth):
     values = []
     stds = []
     for qubit_depth_list in circuit_data[circuit]:
-        if circuit in ["fermionic", "fsim"]:
-            print(len(qubit_depth_list), count)
         if len(qubit_depth_list) > 0:
-            data_dict = qubit_depth_list[index_d]
+            index_d = count - 2
+            data_dict = qubit_depth_list[-1] #index_d
             val = data_dict["Circuit_data"][quantity]
             if quantity == "Expr" and count < 7:
                 dummy = Measurements(PQC(count))
@@ -90,12 +122,20 @@ def quantity_vs_N(circuit, quantity, depth):
                 avg = np.var(grad_list)
                 std = 0
             elif quantity == "Reyni":
-                max_magic = np.log((2**count) + 1) - np.log(2)
-                avg = np.mean(val) / max_magic
-                std = np.std(val) / max_magic
+                haar_m = avg_magic = np.log(3 + 2**count) - np.log(4)
+                #max_magic = np.log((2**count) + 1) - np.log(2)
+                avg = np.mean(val) / haar_m #max_magic
+                std = np.std(val) / haar_m #max_magic
+            elif quantity == "GKP":
+                haar_m = haars[count - 2][0]
+                #max_magic = np.log((2**count) + 1) - np.log(2)
+                avg = np.mean(val) / haar_m #max_magic
+                std = np.std(val) / haar_m #max_magic
             else:
                 avg = np.mean(val)
                 std = np.std(val)
+            
+            
             values.append(avg)
             ns.append(count)
             stds.append(std)
@@ -110,8 +150,11 @@ def plot_quantity_vs_depth(quantity, N):
     for keys, items in circuit_data.items():
         depth, values, std = quantity_vs_depth(keys, quantity, N)
         plt.errorbar(depth, values, yerr=std, color=colours[keys], marker=markers[keys], ms=15, lw=4, label=keys)
-        if quantity == "Expr":
+        if quantity in ["Expr", "Gradients"]:
             plt.gca().set_yscale("log")
+        elif quantity in ["GKP", "Reyni"]:
+            plt.ylim((-0.1, 1.1))
+            plt.xlim((0.5, 13.5))
         quantity_name = label_dict[quantity]
         pretty_graph("Depth", quantity_name, f"{quantity_name} vs depth for {N} qubit PQCs", 20)
     plt.legend(fontsize=18)
@@ -123,10 +166,13 @@ def plot_quantity_vs_N(quantity, depth):
         #    return 0
         ns, values, std = quantity_vs_N(keys, quantity, depth)
         plt.errorbar(ns, values, yerr=std, color=colours[keys], marker=markers[keys], ms=15, lw=4, label=keys)
-        if quantity == "Expr":
+        if quantity in ["Expr", "Gradients"]:
             plt.gca().set_yscale("log")
+        elif quantity in ["GKP", "Reyni"]:
+            plt.ylim((-0.1, 1.1))
+            plt.xlim((1.5, 9.5))
         quantity_name = label_dict[quantity]
-        pretty_graph("N", quantity_name, f"{quantity_name} vs qubit number for {depth} layer PQCs", 20)
+        pretty_graph("N", quantity_name, f"{quantity_name} vs qubit number for l=13 layer PQCs", 20)
     plt.legend(fontsize=18)
 
 
@@ -148,7 +194,6 @@ def plot_quantity_vs_depth_vs_N(circuit, quantity):
     else:
         qubit_range = np.arange(2, len(circuit_data[circuit]) + offset)
     for i in qubit_range:
-        print(i)
         out = quantity_vs_depth(circuit, quantity, i)
         all_data.append(out[1])
     depth_range = np.arange(1,14)
@@ -189,22 +234,22 @@ for N in [4]:
 
 #%%
 for d in [4]:
-    plt.figure(f"Expr vs N, depth {d}" )
+    plt.figure(f"Expr vs N, depth" )
     plot_quantity_vs_N("Expr", d)
     
-    plt.figure(f"Ent vs N, depth {d}" )
+    plt.figure(f"Ent vs N, depth" )
     plot_quantity_vs_N("Ent", d)
     
-    plt.figure(f"Reyni vs N, depth {d}")
+    plt.figure(f"Reyni vs N, depth ")
     plot_quantity_vs_N("Reyni", d)
     
-    plt.figure(f"GKP vs N, depth {d}")
+    plt.figure(f"GKP vs N, depth ")
     plot_quantity_vs_N("GKP", d)
     
-    plt.figure(f"Capped_e-vals vs N, depth {d}")
+    plt.figure(f"Capped_e-vals vs N, depth")
     plot_quantity_vs_N("Capped_e-vals", d)
     
-    plt.figure(f"Var[grad] vs N, depth {d}")
+    plt.figure(f"Var[grad] vs N, depth")
     plot_quantity_vs_N("Gradients", d)
 
 #%%

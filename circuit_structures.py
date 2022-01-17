@@ -300,37 +300,30 @@ def gen_fSim_circuit(p, N, rotator='y'):
         raise Exception("Please supply a valid single qubit rotator")
     layers = []
     for l in range(p):
-        layer = []
-        rotations = [rot_gate(i, N) for i in range(N)]
+        layer = [rot_gate(i, N) for i in range(N)]
         if N % 2 == 0:
             offset = l % 2
             for i in range(offset, N, 2):
                 layer.append(pqc.fSim([i, (i+1)%N], N))
         else:
-            offset = l % N
+            offset = l
+            loop_at_boundary = offset % 2
             pairs = []
+            print(f"ignoring gate {offset}, looping is {loop_at_boundary}")
             indices = [i for i in range(N)]
-            indices.pop(offset)
-            if 0 in indices and 1 in indices:
-                pairs.append((0,1))
-                indices.pop(1)
-                indices.pop(0)
-            elif 0 in indices and N - 1 in indices:
-                pairs.append((0, N - 1))
-                indices.pop(N-1)
-                indices.pop(0)
-            for i in range(len(indices)):
-                in_pairs = False
-                for p in pairs:
-                    if indices[i] in p or indices[i+1] in p:
-                        in_pairs = True
-                if in_pairs is False:
-                    pairs.append((indices[i], indices[i+1]))
-                    indices.pop(i)
-                    indices.pop(i % N) #after popping i, i+1 th elem is now ith elem
-
+            indices.pop(offset) #remove this guy from indices
+            if loop_at_boundary == 1:
+                bottom = indices.pop(0)
+                top = indices.pop(-1)
+                pairs.append((bottom, top))
+            else:
+                pass
+            connect_indices = [(i, i + 1) for i in range(0, len(indices), 2)]
+            print(connect_indices, indices)
+            pairs = pairs + [(indices[i], indices[j]) for i, j in connect_indices]
+            print(pairs)
+            for pair in pairs:
+                layer.append(pqc.fSim([pair[0], pair[1]], N))
             layer.append(rot_gate(offset, N))
-            for p in pairs:
-                layer.append(pqc.fSim([p[0], p[1]], N))
         layers.append(layer)
     return layers
