@@ -284,7 +284,7 @@ def gen_fermionic_circuit(p, N):
                 block = gen_theta_block(x[0] - 1, x[1] - 1, N) #-1 to go from indices -> qubits
                 for bl in block:
                     layer.append(bl)
-        layers.append(layer)
+            layers.append(layer)
     return layers
 
 
@@ -309,7 +309,6 @@ def gen_fSim_circuit(p, N, rotator='y'):
             offset = l
             loop_at_boundary = offset % 2
             pairs = []
-            print(f"ignoring gate {offset}, looping is {loop_at_boundary}")
             indices = [i for i in range(N)]
             indices.pop(offset) #remove this guy from indices
             if loop_at_boundary == 1:
@@ -319,9 +318,7 @@ def gen_fSim_circuit(p, N, rotator='y'):
             else:
                 pass
             connect_indices = [(i, i + 1) for i in range(0, len(indices), 2)]
-            print(connect_indices, indices)
             pairs = pairs + [(indices[i], indices[j]) for i, j in connect_indices]
-            print(pairs)
             for pair in pairs:
                 layer.append(pqc.fSim([pair[0], pair[1]], N))
             layer.append(rot_gate(offset, N))
