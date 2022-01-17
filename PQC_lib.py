@@ -281,6 +281,7 @@ class CZ(EntGate):
         ops = qt.qip.operations
         self._gate = ops.cz_gate
         return self._gate(self._q_N, self._q1, self._q2)
+    
 
 #%% Block entangling gates
 
@@ -330,6 +331,40 @@ class ALLTOALL(EntGate):
 
     def __repr__(self):
         return f"ALL connected {self._entangler.__name__}s"
+
+    
+#%% Arbitrary Gate    
+    
+class ARBGATE(Gate):
+    
+    def __init__(self, Ham):
+        self._Ham = Ham
+        self._theta = 0
+        self._is_param = True
+        self._param_count = 1
+        self._operation = self._set_op()
+ 
+ 
+    def _set_op(self):
+        return (-1j*self._theta*self._Ham).expm() 
+    
+     
+    def set_theta(self, theta):
+        self._theta = theta
+        self._operation = self._set_op()  
+        
+    def derivative(self):
+        deriv = -1j * self._Ham
+        return deriv
+    
+    def __repr__(self):
+        name = type(self).__name__
+        angle = self._theta
+        string = f"{name}({angle:.2f})"
+        return string
+    
+    
+    
 #%% Sharing Parameters
 
 
