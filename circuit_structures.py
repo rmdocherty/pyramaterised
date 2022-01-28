@@ -178,6 +178,12 @@ def generic_HE(p, N, ent_str="cnot"):
         layers.append(layer)
     return layers
 
+def y_CPHASE(p, N):
+    layers = []
+    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
+    for i in range(p):
+        layers.append(layer)
+    return layers
 
 # ============================== PROBLEM INPSIRED CIRCUITS ==============================
 
@@ -228,7 +234,8 @@ def gen_XXZ_layers(p, N):
     init_x_bits = [pqc.X(i, N) for i in range(N)]
     init_H = [pqc.H(i, N) for i in range(N) if i % 2 == 0] #H on even links
     init_CNOT = [pqc.CNOT([i, j], N) for i, j in even_indices]
-    layers = [init_x_bits, init_H, init_CNOT]
+    #layers = [init_x_bits, init_H, init_CNOT]
+    layers = []
     for l in range(p):
         ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
         YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
@@ -295,6 +302,7 @@ def gen_fSim_circuit(p, N, rotator='y'):
     elif r == 'x':
         rot_gate = pqc.R_x
     elif r == 'z':
+        print("using z gate as rotator")
         rot_gate = pqc.R_z
     else:
         raise Exception("Please supply a valid single qubit rotator")
@@ -306,7 +314,7 @@ def gen_fSim_circuit(p, N, rotator='y'):
             for i in range(offset, N, 2):
                 layer.append(pqc.fSim([i, (i+1)%N], N))
         else:
-            offset = l
+            offset = l % N
             loop_at_boundary = offset % 2
             pairs = []
             indices = [i for i in range(N)]

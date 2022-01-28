@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from itertools import product, combinations
 from helper_functions import pretty_subplot
 import random
-
+from memory_profiler import profile
 
 
 class Measurements():
@@ -259,6 +259,7 @@ class Measurements():
             coeffs.append(c_i)
         return coeffs
 
+
     def GKP_Magic(self, psi=None):
         n_qubits = self._QC._n_qubits
         if psi is None:
@@ -301,6 +302,9 @@ class Measurements():
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
         state_pairs = list(combinations(states, r=2))
         overlaps = []
+        magics = []
+        gkps = []
+        q_vals = []
 
         if expr and n < 7:
             for psi, phi in state_pairs:
@@ -310,10 +314,6 @@ class Measurements():
         else:
             expr = -1
 
-        P_n = self._gen_pauli_group()
-        magics = []
-        gkps = []
-        q_vals = []
 
         if ent:
             for psi in states:
@@ -324,6 +324,7 @@ class Measurements():
             q, std = -1, -1
 
         if eom and n < 9:
+            P_n = self._gen_pauli_group()
             for psi in states:
                 entropy_of_magic = self.entropy_of_magic(psi, P_n)
                 magics.append(entropy_of_magic)

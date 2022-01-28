@@ -53,7 +53,6 @@ def pretty_graph(x_label, y_label, title, fontsize):  #formatting graphs
     plt.title(title, fontsize=fontsize)
     plt.ylabel(y_label, fontsize=fontsize)
     plt.tick_params(labelsize=fontsize)
-    plt.gca().set_facecolor("#fffcf5")
 
 def extend(nested_list):
     sizes = []

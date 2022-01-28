@@ -8,9 +8,10 @@ Created on Fri Oct 15 11:22:14 2021
 #%% Imports
 import qutip as qt
 import numpy as np
-from itertools import chain
+from itertools import chain, permutations, combinations
 from copy import copy, deepcopy
 from helper_functions import genFockOp, flatten, prod
+from memory_profiler import profile
 
 rng = np.random.default_rng(1)
 
@@ -321,11 +322,7 @@ class ALLTOALL(EntGate):
 
     def _set_op(self):
         N = self._q_N
-        nested_temp_indices = []
-        for i in range(N - 1):
-            for j in range(i + 1, N):
-                nested_temp_indices.append(rng.perumtation([i, j]))
-        indices = flatten(nested_temp_indices)
+        indices = list(permutations(range(N), 2))
         entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
         return entangling_layer
 
@@ -666,7 +663,7 @@ class PQC():
                     angle1 = rng.random(1)[0] * 2 * np.pi
                 g.set_theta(angle1)
                 param_counter += 1
-
+    
     def run(self, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = self.initial_state
