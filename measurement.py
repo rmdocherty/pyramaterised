@@ -293,6 +293,13 @@ class Measurements():
 
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True, full_data=False, angles='random'):
         n = self._QC._n_qubits
+        
+        if sample_N == 0:
+            expr = False
+            ent = False
+            eom = False
+            GKP = False
+        
         if angles == 'clifford':
             clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
             init_angles = [[random.choice(clifford_angles) for i in range(self._QC.n_params)] for i in range(sample_N)]
@@ -379,6 +386,7 @@ class Measurements():
         return mwexpr, mwstd 
 
     def get_gradient_vector(self, theta):
+        self._QC._quantum_state = self._QC.run(angles=theta)
         psi = self._QC._quantum_state
         self.gradient_list = self._QC.get_gradients()
         gradients = []
@@ -414,7 +422,7 @@ class Measurements():
         trajmaj(angles)
 
         if method.lower() in ["gradient", "qng"]:
-            self._QC._quantum_state = self._QC.run(angles=angles)
+            #self._QC._quantum_state = self._QC.run(angles=angles)
             prev_energy = self.minimize_function(angles)
             while diff > epsilon and count < quit_iterations:
                 theta = self._QC.get_params()

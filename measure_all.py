@@ -100,9 +100,9 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
 def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                        hamiltonian='ZZ', train=True, start='random', start_angles=[], \
                            train_method='gradient', epsilon=1e-6, rate=0.001, save=True, 
-                           plot=True, target_state=-1, train_for="cost", rotator=''):
+                           plot=True, target_state=-1, train_for="cost", rotator='', n_qfim=0):
     random.seed(2)
-    directory = "data/capacity_3/"
+    directory = "data/gradients/"
     start_time = time.time()
     
     circuit_expr = 0
@@ -140,11 +140,12 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True, angles='clifford')
     else:
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
-        
+
+    
     if train is True:
-        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}_{train_method}_tf{train_for}"
+        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{n_qfim}g_{start}_{train_method}_tf{train_for}"
     else:
-        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}"
+        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{n_qfim}g_{start}"
 
     fp = f"{directory}{file_name}"
 
@@ -159,7 +160,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     circuit_GKP = circuit_data['GKP']
     circuit_gradients = []
 
-    for i in range(n_samples // 20):
+    for i in range(n_qfim):
         circuit.set_H('ZZ')
         if start == "random":
             init_angles = [random.random() * 2 * np.pi for i in range(circuit.n_params)]
