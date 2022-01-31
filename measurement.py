@@ -180,6 +180,18 @@ class Measurements():
             summand += density_matrix.tr()
         Q = 2 * (1 - (1 / n) * summand)
         return Q
+    
+    def state_entanglement(self):
+        state = self._QC._quantum_state
+        summand = 0
+        n = self._QC._n_qubits
+        for k in range(n):
+            density_matrix = state.ptrace(k)
+            density_matrix *= density_matrix
+            summand += density_matrix.tr()
+        Q = 2 * (1 - (1 / n) * summand)
+        return Q
+        
 
     def entanglement(self, sample_N, graphs=False):
         """
