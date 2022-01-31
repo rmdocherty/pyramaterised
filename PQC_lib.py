@@ -340,17 +340,20 @@ class ARBGATE(Gate):
         self._param_count = 1
         self._operation = self._set_op()
  
- 
     def _set_op(self):
-        return (-1j*self._theta*self._Ham).expm() 
-    
-     
+        exponent = (-1j*self._theta*self._Ham)
+        mat = exponent.expm()
+        return mat
+
+    def flip_pauli(self):
+        self._pauli = -1 * self._pauli
+         
     def set_theta(self, theta):
         self._theta = theta
         self._operation = self._set_op()  
         
     def derivative(self):
-        deriv = -1j * self._Ham
+        deriv = -1j * self._Ham / 2
         return deriv
     
     def __repr__(self):
