@@ -8,9 +8,10 @@ Created on Fri Oct 15 11:22:14 2021
 #%% Imports
 import qutip as qt
 import numpy as np
-from itertools import chain
+from itertools import chain, permutations, combinations
 from copy import copy, deepcopy
 from helper_functions import genFockOp, flatten, prod
+from memory_profiler import profile
 
 rng = np.random.default_rng(1)
 
@@ -122,6 +123,10 @@ class negative_R_z(R_z):
     def set_theta(self, theta):
         self._theta = -1 * theta
         self._operation = self._set_op()
+    
+    def derivative(self): #as -theta in expo need to change derivative sign
+        deriv = 1j * self._fock / 2
+        return deriv
 
 
 class offset_R_z(R_z):
@@ -317,11 +322,7 @@ class ALLTOALL(EntGate):
 
     def _set_op(self):
         N = self._q_N
-        nested_temp_indices = []
-        for i in range(N - 1):
-            for j in range(i + 1, N):
-                nested_temp_indices.append(rng.perumtation([i, j]))
-        indices = flatten(nested_temp_indices)
+        indices = list(permutations(range(N), 2))
         entangling_layer = prod([self._entangler(index_pair, N) for index_pair in indices][::-1])
         return entangling_layer
 
@@ -512,8 +513,8 @@ def fsim_gate_d_theta(theta, phi, N=None, control=0, target=1):
     if N is not None:
         return qt.qip.operations.gate_expand_2toN(fsim_gate_d_theta(theta, phi), N, control, target)
     return qt.Qobj([[1,                   0,                   0,                  0],
-                    [0,       -1 * np.sin(theta), 1j * np.cos(theta),                  0],
-                    [0, 1j * np.cos(theta),      -1 *  np.sin(theta),                  0],
+                    [0,       -1 * np.sin(theta), -1j * np.cos(theta),                  0],
+                    [0, -1j * np.cos(theta),      -1 *  np.sin(theta),                  0],
                     [0,                   0,                   0, np.exp(-1j * phi)]],
                     dims=[[2, 2], [2, 2]])
 
@@ -629,7 +630,7 @@ class PQC():
                 self._parameterised.append(param_count)
             else:
                 self._parameterised.append(-1)
-        self.n_params = len([i for i in self._parameterised if i > -1])
+        self.n_params = param_count
 
     def get_params(self):
         angles = []
@@ -665,7 +666,7 @@ class PQC():
                     angle1 = rng.random(1)[0] * 2 * np.pi
                 g.set_theta(angle1)
                 param_counter += 1
-
+    
     def run(self, angles=[]):
         """Set |psi> of a PQC by multiplying the basis state by the gates."""
         circuit_state = self.initial_state
@@ -726,13 +727,14 @@ class PQC():
         then apply them to the basis state."""
         gradient_state_list = []
         parameterised = [i for i in self.gates if i._param_count > 0]
-        for g in parameterised:
+        for count, g in enumerate(parameterised):
             if g._param_count == 1:
                 gradient = self.take_derivative(g)
                 gradient_state_list.append(gradient)
             elif g._param_count == 2:
-                gradient1 = self.take_derivative(g, param=1)
-                gradient2 = self.take_derivative(g, param=2)
+                gradient1 = self.take_derivative(g, param=1) 
+                g_prime = self.gates[count] # copy op in take deriv changes ref of ith gate so need to 'find' it again
+                gradient2 = self.take_derivative(g_prime, param=2)
                 gradient_state_list.append(gradient1)
                 gradient_state_list.append(gradient2)
         return gradient_state_list

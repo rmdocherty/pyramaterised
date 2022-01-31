@@ -46,8 +46,9 @@ g, h = 1, 0
 #%%
 
 
-def generate_circuit(circuit_type, N, p, hamiltonian):
+def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
     circuit = pqc.PQC(N)
+
 
     if circuit_type == "NPQC":
         layers, theta_ref = cs.NPQC_layers(p, N)
@@ -57,6 +58,9 @@ def generate_circuit(circuit_type, N, p, hamiltonian):
         layers = cs.gen_modified_TFIM_layers(p, N)
     elif circuit_type == "XXZ":
         layers = cs.gen_XXZ_layers(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored
     elif circuit_type == "Circuit_1":
         layers = cs.circuit_1(p, N)
     elif circuit_type == "Circuit_2":
@@ -67,22 +71,38 @@ def generate_circuit(circuit_type, N, p, hamiltonian):
         layers = cs.qg_circuit(p, N)
     elif circuit_type == "generic_HE":
         layers = cs.generic_HE(p, N)
+    elif circuit_type == "y_CPHASE":
+        layers = cs.y_CPHASE(p, N)
+    elif circuit_type == "fermionic":
+        layers = cs.gen_fermionic_circuit(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored #need to set half as |1> an half as |0>
+    elif circuit_type == "fsim":
+        if rotator in ['x', 'y', 'z']:
+            layers = cs.gen_fSim_circuit(p, N, rotator=rotator)
+        else:
+            layers = cs.gen_fSim_circuit(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored #need to set half as |1> an half as |0>
 
     for l in layers:
         circuit.add_layer(l)
 
-    if hamiltonian == "TFIM":
+    """if hamiltonian == "TFIM":
         ham = cs.TFIM_hamiltonian(N, g=g, h=h)
-        circuit.set_H(ham)
+        circuit.set_H(ham)"""
             
     return circuit
 
 
 def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                        hamiltonian='ZZ', train=True, start='random', start_angles=[], \
-                           train_method='gradient', epsilon=1e-6, rate=0.001, save=True, plot=True, target_state=-1, train_for="cost"):
+                           train_method='gradient', epsilon=1e-6, rate=0.001, save=True, 
+                           plot=True, target_state=-1, train_for="cost", rotator='', n_qfim=0):
     random.seed(2)
-    directory = "magic_optimize_data/"
+    directory = "data/gradients/"
     start_time = time.time()
     
     circuit_expr = 0
@@ -106,7 +126,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                         "train_method": train_method, "epsilon": epsilon, "rate": rate,
                         "n_repeats": n_repeats, "n_samples": n_samples}
 
-    circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian)
+    circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian, rotator=rotator)
     circuit_m = Measurements(circuit)
     
     if train_for == "magic":
@@ -120,11 +140,12 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True, angles='clifford')
     else:
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
-        
+
+    
     if train is True:
-        file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}_{train_method}_tf{train_for}"
+        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{n_qfim}g_{start}_{train_method}_tf{train_for}"
     else:
-        file_name = f"{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{start}"
+        file_name = f"{rotator}{circuit_type}_{hamiltonian}_{n_qubits}q_{n_layers}l_{n_repeats}r_{n_qfim}g_{start}"
 
     fp = f"{directory}{file_name}"
 
@@ -139,7 +160,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     circuit_GKP = circuit_data['GKP']
     circuit_gradients = []
 
-    for i in range(n_samples // 20):
+    for i in range(n_qfim):
         circuit.set_H('ZZ')
         if start == "random":
             init_angles = [random.random() * 2 * np.pi for i in range(circuit.n_params)]
@@ -147,8 +168,9 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
             clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
             init_angles = [random.choice(clifford_angles) for i in range(circuit.n_params)]
         gradients = circuit_m.get_gradient_vector(init_angles)
-        for g in gradients:
-            circuit_gradients.append(g)
+        #for g in gradients: # change this to circuit_gradients.append(gradient later!)
+        #    circuit_gradients.append(g)
+        circuit_gradients.append(gradients)
         circuit_QFI = circuit_m._get_QFI(grad_list=circuit_m.gradient_list) #should put this in the repeats and save whole array
         eigvals, _ = circuit_m.get_eigenvalues(circuit_QFI)
         circuit_eigvals.append(eigvals)
