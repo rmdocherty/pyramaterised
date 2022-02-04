@@ -102,7 +102,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                            train_method='gradient', epsilon=1e-6, rate=0.001, save=True, 
                            plot=True, target_state=-1, train_for="cost", rotator='', n_qfim=0):
     random.seed(2)
-    directory = "data/gradients/"
+    directory = "data/capacity_3/"
     start_time = time.time()
     
     circuit_expr = 0

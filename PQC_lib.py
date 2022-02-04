@@ -369,20 +369,29 @@ class ARBGATE(Gate):
 
 
 class shared_parameter(PRot):
-    def __init__(self, layer, q_N):
+    def __init__(self, layer, q_N, commute=True):
         self._layer = layer
         self._theta = 0
         self._q_N = q_N
         self._is_param = True
         self._param_count = 1
+        self._commute = commute
         self._operation = self._set_op()
 
     def derivative(self):
         """H=sum(H_s) -> d_theta U = d_theta (e^i*H*theta) = sum(H_s * U)"""
         deriv = 0
-        for g in self._layer:
-            single_deriv = g.derivative()
-            deriv = deriv + single_deriv #multiply or plus?
+        if self._commute is True: # can do this i.f.f all gates in layer commute
+            for g in self._layer:
+                single_deriv = g.derivative()
+                deriv = deriv + single_deriv #multiply or plus?
+        else:
+            for count, g in enumerate(self._layer):
+                current_gate_deriv = g.derivative()
+                new_layer = copy(self._layer)
+                new_layer[count] = current_gate_deriv * new_layer[count]
+                deriv = deriv + prod(new_layer[::-1])
+            deriv = deriv * self._operation.conj() #in pqc.take_derivative we multiply by gates at the end, need to get rid of that
         return deriv
 
     def set_theta(self, theta):

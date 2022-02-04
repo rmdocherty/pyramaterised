@@ -8,21 +8,31 @@ Created on Sat Aug  7 21:20:44 2021
 import qutip as qt
 import numpy as np
 import scipy
+import pickle
 import matplotlib.pyplot as plt
 from itertools import product, combinations
 from helper_functions import pretty_subplot
 import random
-from memory_profiler import profile
 
 
 class Measurements():
-    def __init__(self, QC):
+    def __init__(self, QC, load=False):
         self._QC = QC
         try:
             self.minimize_function = QC.cost
         except AttributeError:
             self.minimize_function = 0
-    
+        if load is True:
+            try:
+                with open("pauli_groups.pickle", 'rb') as file:
+                    data = pickle.load(file)
+                    N = QC._n_qubits
+                    self._P_n = data[str(N)]
+            except (FileNotFoundError, KeyError):
+                self._P_n = []
+        else:
+            self._P_n = []
+
     def set_minimise_function(self, function):
         self.minimize_function = function
 
@@ -343,7 +353,11 @@ class Measurements():
             q, std = -1, -1
 
         if eom and n < 9:
-            P_n = self._gen_pauli_group()
+            if self._P_n != []:
+                P_n = self._P_n
+            else:
+                P_n = self._gen_pauli_group()
+
             for psi in states:
                 entropy_of_magic = self.entropy_of_magic(psi, P_n)
                 magics.append(entropy_of_magic)

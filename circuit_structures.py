@@ -237,14 +237,15 @@ def gen_XXZ_layers(p, N):
     #layers = [init_x_bits, init_H, init_CNOT]
     layers = []
     for l in range(p):
+        layer = []
         ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
         YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
         ZZ_2 = [pqc.R_zz((i, j), N) for i, j in even_indices]
         YY_XX_2 = [pqc.R_yy((i, j), N) for i, j in even_indices] + [pqc.R_xx((i, j), N) for i, j in even_indices]
         theta = [pqc.shared_parameter(ZZ_1, N)]
-        phi = [pqc.shared_parameter(YY_XX_1, N)]
+        phi = [pqc.shared_parameter(YY_XX_1, N, commute=False)]
         beta = [pqc.shared_parameter(ZZ_2, N)]
-        gamma = [pqc.shared_parameter(YY_XX_2, N)]
+        gamma = [pqc.shared_parameter(YY_XX_2, N, commute=False)]
         layer = theta + phi + beta + gamma
         layers.append(layer)
     return layers
