@@ -343,8 +343,7 @@ class Measurements():
         else:
             expr = -1
 
-
-        if ent:
+        if ent and n < 13:
             for psi in states:
                 Q = self._single_Q(psi, n)
                 q_vals.append(Q)
@@ -365,7 +364,7 @@ class Measurements():
         else:
             magic_bar, magic_std = -1, -1
 
-        if GKP:
+        if GKP and n < 13:
             for psi in states:
                 gkp = self.GKP_Magic(psi)
                 gkps.append(gkp)
