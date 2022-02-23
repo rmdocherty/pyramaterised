@@ -478,6 +478,7 @@ class RR_block(shared_parameter):
         self._param_count = 1
         self._layer = self.gen_layer()
         self._operation = self._set_op()
+        self._commute = True
     
     def gen_layer(self):
         N = self._q_N

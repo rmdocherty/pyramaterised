@@ -50,9 +50,9 @@ else:
 #circuit_data = {"TFIM": [], "XXZ": [], "generic_HE": [], "fsim": [], "fermionic": [], "qg_circuit": [], "NPQC": [], "y_CPHASE": [], "zfsim": []} #, "Circuit_9": []
 
 
-def load_file(circuit, n_q, n_l):
-    file_name_1 = f"data/combined/{circuit}_ZZ_{n_q}q_{n_l}l_0r_30g_random.pickle"
-    file_name_2 = f"data/combined/{circuit}_ZZ_{n_q}q_{n_l}l_0r_0g_random.pickle"
+def load_file(circuit, n_q, n_l, loc="combined"):
+    file_name_1 = f"data/{loc}/{circuit}_ZZ_{n_q}q_{n_l}l_0r_30g_random.pickle"
+    file_name_2 = f"data/{loc}/{circuit}_ZZ_{n_q}q_{n_l}l_0r_0g_random.pickle"
     try:
         file = open(file_name_1, 'rb')
     except FileNotFoundError:
@@ -65,7 +65,7 @@ def load_file(circuit, n_q, n_l):
     return temp_data
 
 
-def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14)):
+def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14), loc="combined"):
     circuit_data = {key: [] for key in circuits_to_load}
     for c in circuits_to_load:
         for n_qubits in range(qubit_range[0], qubit_range[1]):
@@ -73,8 +73,10 @@ def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14)):
             for n_layers in range(depth_range[0], depth_range[1]):
                 if c in ["XXZ", "TFIM", "fsim", "zfsim"] and n_qubits % 2 == 1:
                     file_data = []
+                elif n_qubits > 8 and depth_range == (30,31):
+                    file_data = load_file(c, n_qubits, 50, loc=loc)
                 else:
-                    file_data = load_file(c, n_qubits, n_layers)
+                    file_data = load_file(c, n_qubits, n_layers, loc=loc)
                 qubit_data.append(file_data)
             circuit_data[c].append(qubit_data)
     return circuit_data
@@ -85,6 +87,8 @@ def get_values_from_circuit_data(data_dict, quantity, index_n=0):
 
     if quantity in ["QFIM_e-vals", "avg_e-vals", "std_e-vals"]:
         val = data_dict["QFIM_e-vals"]
+    elif quantity == "F":
+        val = data_dict["Expr"]
     else:
         val = data_dict[quantity]
 
@@ -101,18 +105,21 @@ def get_values_from_circuit_data(data_dict, quantity, index_n=0):
         std = 0
     elif quantity == "Reyni":
         haar_m = np.log(3 + 2**N) - np.log(4)
-        avg = np.mean(val) / haar_m
-        std = np.std(val) / haar_m
+        avg = np.mean(val) / N#/ haar_m
+        std = np.std(val) / N #haar_m
     elif quantity == "GKP":
-        haar_m = haars[index_n][0]
-        avg = np.mean(val) / haar_m
-        std = np.std(val) / haar_m
+        #haar_m = haars[index_n][0]
+        avg = np.mean(val) / N#haar_m
+        std = np.std(val) / N#haar_m
     elif quantity == "QFIM_e-vals":
         non_zeros = []
         for i in val:
             n_non_zero = len([j for j in i if np.abs(j) > 10**-12])
             non_zeros.append(n_non_zero)
         avg = np.mean(non_zeros)
+        std = 0
+    elif quantity == "F":
+        avg = val
         std = 0
     else:
         avg = np.mean(val)
@@ -144,10 +151,13 @@ def get_data_array_from_dict(circuit_dict, quantity, fixed_N=0, fixed_d=0):
             index_d = fixed_d - 1 if fixed_d != -1 else -1
             for N, data_dict in enumerate(data_dict_list):
                 try:
-                    out_data = get_values_from_circuit_data(data_dict[index_d]["Circuit_data"], quantity, index_n=N)
-                    circuit_x.append(N + 2)
-                    circuit_y.append(out_data[0])
-                    circuit_err.append(out_data[1])
+                    if circuit in ["XXZ", "fermionic"] and N < 1 and quantity == "Gradients":
+                        pass
+                    else:
+                        out_data = get_values_from_circuit_data(data_dict[index_d]["Circuit_data"], quantity, index_n=N)
+                        circuit_x.append(N + 2)
+                        circuit_y.append(out_data[0])
+                        circuit_err.append(out_data[1])
                 except TypeError:
                     pass
 
@@ -166,7 +176,7 @@ def map_style_dict_to_list(loaded_circuits, style_dict):
 
 markers = {"TFIM": 'p', "XXZ": 'x', "generic_HE": 'h', "fsim": 'o', "fermionic": 's', "Circuit_9": '$9$', "qg_circuit": '^', "y_CPHASE": '$Y$', "zfsim": '$Z$', "NPQC": 'v'}
 colours = {"TFIM": "#5ADBFF", "XXZ": "#235789", "generic_HE": "#C1292E", "fsim": "#F1D302", "fermionic": "#E9BCB7", "qg_circuit": "#139A43", "Circuit_9": "#FF8552", "y_CPHASE": "orange", "NPQC": "#395756", "zfsim": "#A67DB8"}
-label_dict = {"Expr": "Expr, $D_{KL}$", "Ent": "Ent, <Q>", "Reyni": "Relative Reyni Magic", "GKP": "Relative GKP Magic", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "$G_{c}$"}
+label_dict = {"Expr": "Expr, $D_{KL}$", "Ent": "Ent, <Q>", "Reyni": "$\\mathcal{M}_{2} \\mathrm{ / N} $", "GKP": "$\\mathcal{G} \\mathrm{ / N} $", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "$G_{c}$"}
 title_dict = {"Expr": "Expressibility", "Ent": "Entanglement", "Reyni": "Reyni Entropy of Magic", "GKP": "GKP Magic ", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "Effective quant"}
 
 
@@ -176,7 +186,7 @@ to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "NPQC
 
 
 def plot_data(circuit_dict, quantity, fixed_N=0, fixed_depth=0, logx=False, 
-              logy=False, save=False, add_legend=True):
+              logy=False, save=False, add_legend=True, fontsize=18, figcols=2):
     marker_list = map_style_dict_to_list(circuit_dict.keys(), markers)
     colour_list = map_style_dict_to_list(circuit_dict.keys(), colours)
     if save is True:
@@ -200,58 +210,98 @@ def plot_data(circuit_dict, quantity, fixed_N=0, fixed_depth=0, logx=False,
     plot1D(data[1], x=data[0], xlabelstring=x_axis_str, ylabelstring=label_dict[quantity], legend=legend, 
            customMarkerStyle=marker_list, customlinewidth=[4 for i in range(len(to_load))], 
            customplot1DLinestyle=["-" for i in range(len(to_load))], customColorList=colour_list,
-           logy=logy, logx=logx, saveto=save_path, dataname=dataname)
+           logy=logy, logx=logx, saveto=save_path, dataname=dataname, fontsize=fontsize, legendcol=figcols)
 
 #%%
-to_load = ["TFIM", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
-cd = load_data(to_load, qubit_range=(2, 5))
 
-plot_data(cd, "Expr", fixed_N=4, logy=True, save=True, add_legend=False)
-plot_data(cd, "Reyni", fixed_N=4, save=True, add_legend=False)
-plot_data(cd, "GKP", fixed_N=4, save=True, add_legend=False)
-
-plot_data(cd, "Ent", fixed_N=4, save=True, add_legend=True)
-
-plot_data(cd, "Gradients", fixed_N=4, logy=True, save=True, add_legend=False)
-
-#%%
-cd = load_data(to_load, qubit_range=(2, 7))
-plot_data(cd, "Expr", fixed_N=4, logy=True)
-
-
-
-#%%
-to_load = ["TFIM", "generic_HE", "qg_circuit", "fsim", "fermionic", "NPQC", "y_CPHASE", "zfsim"]
-cd = load_data(to_load, qubit_range=(2, 9))
-plot_data(cd, "Reyni", fixed_depth=-1 , save=True, add_legend=False)
-plot_data(cd, "GKP", fixed_depth=-1, save=True, add_legend=False)
-
-plot_data(cd, "Ent", fixed_depth=-1, save=True, add_legend=False)
-
-cd = load_data(to_load, qubit_range=(2, 7))
-plot_data(cd, "Expr", fixed_depth=-1, logy=True, save=True, add_legend=False)
-
-cd = load_data(to_load, qubit_range=(2, 13))
-plot_data(cd, "Gradients", fixed_depth=-1, logy=True, save=True, add_legend=False)
-#%%
-expo_scale = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim"]
-non_expo_scale = ["y_CPHASE", "TFIM", "fermionic"]
-
-for count, circuits in enumerate([expo_scale, non_expo_scale]):
-    temp_cd = load_data(circuits, qubit_range=(2, 7))
-    temp_data = get_data_array_from_dict(temp_cd, "QFIM_e-vals", fixed_N=0, fixed_d=-1)
-    for i, c in enumerate(circuits):
-        x = temp_data[0][i]
-        logx = np.log(np.array(x))
-        y = temp_data[1][i]
-        logy = np.log(np.array(y))
-        if count == 0:
-            log_coeff = np.polyfit(x, logy, deg=1)
-        else:
-            log_coeff = np.polyfit(logx, logy, deg=1)
-        print(f"{c} linear coeffs: {log_coeff[0]:.3f}, {log_coeff[1]:.3f}")
+if __name__ == "__main__":
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
+    cd = load_data(to_load, qubit_range=(2, 10))
     
-    if count == 0:
-        plot_data(temp_cd, "QFIM_e-vals", fixed_depth=-1, logy=True, save=True, add_legend=True)
-    else:
-        plot_data(temp_cd, "QFIM_e-vals", fixed_depth=-1, logy=True, logx=True, save=True, add_legend=True)
+    plot_data(cd, "Expr", fixed_N=6, logy=True, save=False, add_legend=False)
+    plot_data(cd, "Reyni", fixed_N=4, save=False, add_legend=False)
+    plot_data(cd, "GKP", fixed_N=4, save=False, add_legend=False)
+    
+    #%%
+    plot_data(cd, "Ent", fixed_N=4, save=True, add_legend=True, fontsize=16, figcols=2)
+    
+    #%%
+    cd = load_data(to_load, qubit_range=(2, 11))
+    plot_data(cd, "Gradients", fixed_N=6, logy=True, save=True, add_legend=False)
+    
+    #%%
+    cd = load_data(to_load, qubit_range=(2, 13))
+    #%%
+    plot_data(cd, "QFIM_e-vals", fixed_N=10, logy=True, save=True, add_legend=False)
+    
+    
+    #%%
+    cd = load_data(to_load, qubit_range=(2, 7))
+    plot_data(cd, "Expr", fixed_N=4, logy=True)
+    
+    
+    
+    #%%
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
+    cd = load_data(to_load, qubit_range=(2, 9))
+    plot_data(cd, "Reyni", fixed_depth=1 , save=False, add_legend=False)
+    plot_data(cd, "GKP", fixed_depth=1, save=False, add_legend=False)
+    
+    #%%
+    #cd = load_data(to_load, qubit_range=(2, 11))
+    plot_data(cd, "Ent", fixed_depth=-1, save=True, add_legend=False)
+    
+    cd = load_data(to_load, qubit_range=(2, 7))
+    plot_data(cd, "Expr", fixed_depth=-1, logy=True, save=True, add_legend=False)
+    
+    cd = load_data(to_load, qubit_range=(2, 13))
+    plot_data(cd, "Gradients", fixed_depth=-1, logy=True, save=True, add_legend=False)
+    #%%
+    expo_scale = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim"]
+    non_expo_scale = ["y_CPHASE", "TFIM", "fermionic"]
+    
+    for count, circuits in enumerate([expo_scale, non_expo_scale]):
+        temp_cd = load_data(circuits, qubit_range=(2, 13))
+        temp_data = get_data_array_from_dict(temp_cd, "QFIM_e-vals", fixed_N=0, fixed_d=-1)
+        for i, c in enumerate(circuits):
+            x = temp_data[0][i]
+            logx = np.log(np.array(x))
+            y = temp_data[1][i]
+            logy = np.log(np.array(y))
+            if count == 0:
+                log_coeff = np.polyfit(x, logy, deg=1)
+            else:
+                log_coeff = np.polyfit(logx, logy, deg=1)
+            print(f"{c} linear coeffs: {log_coeff[0]:.3f}, {log_coeff[1]:.3f}")
+        
+        if count == 0:
+            plot_data(temp_cd, "QFIM_e-vals", fixed_depth=-1, logy=True, save=True, add_legend=True)
+        else:
+            plot_data(temp_cd, "QFIM_e-vals", fixed_depth=-1, logy=True, logx=True, save=True, add_legend=True)
+    
+    #%%
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
+    cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
+    plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=False, add_legend=True, logy=True, fontsize=12)
+    #%%
+    plot_data(cd, "Reyni", fixed_depth=-1  , save=True, add_legend=True, fontsize=12)
+    plot_data(cd, "GKP", fixed_depth=-1 , save=True, add_legend=True, fontsize=12)
+    plot_data(cd, "Ent", fixed_depth=-1  , save=True, add_legend=True, fontsize=12)
+    #%%
+    plot_data(cd, "QFIM_e-vals", fixed_depth=-1  , save=True, add_legend=True, fontsize=12, logy=True, logx=True)
+    #%%
+    cd = load_data(to_load, qubit_range=(2, 7), depth_range=(30, 31), loc="deep_circuits")
+    plot_data(cd, "Expr", fixed_depth=-1 , save=True, add_legend=True, fontsize=12, logy=True)
+    
+    #%%
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
+    cd = load_data(to_load, qubit_range=(2, 11), depth_range=(1, 17), loc="deep_circuits")
+    #%%
+    plot_data(cd, "Reyni", fixed_N=4 , save=True, add_legend=True, fontsize=12)
+    plot_data(cd, "GKP", fixed_N=4 , save=True, add_legend=True, fontsize=12)
+    #plot_data(cd, "Ent", fixed_N=4 , save=True, add_legend=True, fontsize=12)
+    #plot_data(cd, "Expr", fixed_N=4 , save=True, add_legend=True, fontsize=12, logy=True)
+    
+    #plot_data(cd, "GKP", fixed_depth=-1, save=True, add_legend=False)
+    #%%
+    plot_data(cd, "Gradients", fixed_N=4 , save=True, add_legend=True, fontsize=12, logy=True)

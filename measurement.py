@@ -29,6 +29,7 @@ class Measurements():
                     N = QC._n_qubits
                     self._P_n = data[str(N)]
             except (FileNotFoundError, KeyError):
+                print("error opening reyni")
                 self._P_n = []
         else:
             self._P_n = []
@@ -124,7 +125,7 @@ class Measurements():
             F: List of floats, 0 < f < 1 that are fidelity midpoints,
         """
         #bin no. = 75 from paper
-        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1))
+        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1)) #used to be 1, could be np.amax(F_samples)
         prob = prob / sum(prob) #normalise by sum of prob or length?
         #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
@@ -138,6 +139,21 @@ class Measurements():
 
         expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         return expr
+    
+    def _gen_log_histo(self, F_samples):
+        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples))) #used to be 1, could be np.amax(F_samples)
+        prob = prob / sum(prob) #normalise by sum of prob or length?
+        #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
+        F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
+        return prob, F
+    
+    def _log_expr(self, F_samples, N):
+        P_pqc, F = self._gen_log_histo(F_samples)
+        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
+        P_haar = haar / sum(haar) #do i need to normalise this?
+
+        expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
+        return np.log(expr)
 
     def expressibility(self, sample_N, graphs=False):
         """
@@ -335,11 +351,14 @@ class Measurements():
         gkps = []
         q_vals = []
 
-        if expr and n < 7:
+        if expr:
             for psi, phi in state_pairs:
                 F = np.abs(psi.overlap(phi))**2
                 overlaps.append(F)
-            expr = self._expr(overlaps, 2**n)
+            if n < 7: #if we're rnning to large N we only want the overlaps
+                expr = self._expr(overlaps, 2**n)
+            else:
+                expr = -1
         else:
             expr = -1
 

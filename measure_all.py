@@ -46,7 +46,7 @@ g, h = 1, 0
 #%%
 
 
-def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
+def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=True):
     circuit = pqc.PQC(N)
 
 
@@ -59,6 +59,8 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
     elif circuit_type == "XXZ":
         layers = cs.gen_XXZ_layers(p, N)
         init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
         tensored = qt.tensor(init_state)
         circuit.initial_state = tensored
     elif circuit_type == "Circuit_1":
@@ -76,6 +78,8 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
     elif circuit_type == "fermionic":
         layers = cs.gen_fermionic_circuit(p, N)
         init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
         tensored = qt.tensor(init_state)
         circuit.initial_state = tensored #need to set half as |1> an half as |0>
     elif circuit_type == "fsim":
@@ -84,6 +88,8 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
         else:
             layers = cs.gen_fSim_circuit(p, N)
         init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
         tensored = qt.tensor(init_state)
         circuit.initial_state = tensored #need to set half as |1> an half as |0>
 
@@ -100,7 +106,7 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator=''):
 def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                        hamiltonian='ZZ', train=True, start='random', start_angles=[], \
                            train_method='gradient', epsilon=1e-6, rate=0.001, save=True, 
-                           plot=True, target_state=-1, train_for="cost", rotator='', n_qfim=0):
+                           plot=True, target_state=-1, train_for="cost", rotator='', n_qfim=0, expr_only=False):
     random.seed(2)
     directory = "data/deep_circuits/"
     start_time = time.time()
@@ -127,7 +133,7 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
                         "n_repeats": n_repeats, "n_samples": n_samples}
 
     circuit = generate_circuit(circuit_type, n_qubits, n_layers, hamiltonian, rotator=rotator)
-    circuit_m = Measurements(circuit)
+    circuit_m = Measurements(circuit, load=True)
     
     if train_for == "magic":
         circuit_m.set_minimise_function(circuit_m.theta_to_magic)
@@ -139,7 +145,11 @@ def measure_everything(circuit_type, n_qubits, n_layers, n_repeats, n_samples, \
     if start == "clifford":
         circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True, angles='clifford')
     else:
-        circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
+        if expr_only is True:
+            print("Only computing F-samples!")
+            circuit_data = circuit_m.efficient_measurements(n_samples, expr=True, GKP=False, ent=False, eom=False, full_data=True)
+        else:
+            circuit_data = circuit_m.efficient_measurements(n_samples, full_data=True)
 
     
     if train is True:
