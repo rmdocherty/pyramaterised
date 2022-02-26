@@ -38,7 +38,7 @@ class Measurements():
         self.minimize_function = function
 
     def _get_QFI(self, grad_list=[]):
-        """
+        """True
         Given the input QC and it's gradient state list, calculate the assoicated
         QFI matrix by finding F_i,j = Re{<d_i psi| d_j psi>} - <d_i psi|psi><psi|d_j psi>
         for each i,j in n_params.
@@ -125,34 +125,54 @@ class Measurements():
             F: List of floats, 0 < f < 1 that are fidelity midpoints,
         """
         #bin no. = 75 from paper
-        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1)) #used to be 1, could be np.amax(F_samples)
+        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1))#, range=(0, 1) #used to be 1, could be np.amax(F_samples)
         prob = prob / sum(prob) #normalise by sum of prob or length?
         #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
         return prob, F
 
     def _expr(self, F_samples, N):
+        if len(F_samples) == 0:
+            return 0
         P_pqc, F = self._gen_histo(F_samples)
 
         haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
         P_haar = haar / sum(haar) #do i need to normalise this?
+        #plt.figure("haar")
+        #plt.plot(F, P_haar, label="haar")
+        #plt.plot(F, P_pqc, label="pqc")
+        #plt.legend()
 
         expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         return expr
     
     def _gen_log_histo(self, F_samples):
-        prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples))) #used to be 1, could be np.amax(F_samples)
+        prob, edges = np.histogram((np.array(F_samples)), bins=int((75 / 10000) * len(F_samples))) #used to be 1, could be np.amax(F_samples)
         prob = prob / sum(prob) #normalise by sum of prob or length?
         #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
+
+        
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
+        #plt.plot(F, [0 for i in range(len(F))], ls="", ms=4, marker="*")
         return prob, F
     
     def _log_expr(self, F_samples, N):
-        P_pqc, F = self._gen_log_histo(F_samples)
-        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
-        P_haar = haar / sum(haar) #do i need to normalise this?
+        if len(F_samples) == 0:
+            return 0
+        #P_pqc, F = self._gen_histo(F_samples)
+        log_P_pqc, log_F = self._gen_log_histo(F_samples)
+        
+        #first_term = np.log(N-1)
+        #second_term = (N - 2) 
+        #third_term = np.log(1 - F) #from definition in expr paper
+        #log_haar = first_term + second_term * third_term
+        log_haar = (N - 1) * ((1 - log_F) ** (N - 2))
+        log_P_haar = log_haar / sum(log_haar) #do i need to normalise this?
+        #plt.figure("log haar")
+        #plt.plot(np.log(F), log_P_haar, label="haar")
+        #plt.plot(log_F, log_P_pqc, label="pqc")
 
-        expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
+        expr = np.sum(scipy.special.kl_div(log_P_pqc, log_P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         return np.log(expr)
 
     def expressibility(self, sample_N, graphs=False):
@@ -341,7 +361,7 @@ class Measurements():
         if angles == 'clifford':
             clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
             init_angles = [[random.choice(clifford_angles) for i in range(self._QC.n_params)] for i in range(sample_N)]
-            states = [self._QC.gen_quantum_state(init) for init in init_angles]
+            states = [self._QC.run(angles=init) for init in init_angles]
         else:
             states = [self._QC.gen_quantum_state() for i in range(sample_N)]
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr

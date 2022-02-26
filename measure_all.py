@@ -73,6 +73,8 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=T
         layers = cs.qg_circuit(p, N)
     elif circuit_type == "generic_HE":
         layers = cs.generic_HE(p, N)
+    elif circuit_type == "clifford":
+        layers = cs.clifford_HE(p, N)
     elif circuit_type == "y_CPHASE":
         layers = cs.y_CPHASE(p, N)
     elif circuit_type == "fermionic":

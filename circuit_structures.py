@@ -178,6 +178,14 @@ def generic_HE(p, N, ent_str="cnot"):
         layers.append(layer)
     return layers
 
+def clifford_HE(p, N, ent_str="cnot"):
+    entangler = string_to_entangler(ent_str)
+    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layers = [] 
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
 def y_CPHASE(p, N):
     layers = []
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
