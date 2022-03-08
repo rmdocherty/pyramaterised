@@ -304,7 +304,7 @@ def gen_fermionic_circuit(p, N):
     return layers
 
 
-def gen_fSim_circuit(p, N, rotator='y'):
+def gen_fSim_circuit(p, N, rotator='y', fixed=False):
     r = rotator.lower()
     if r == 'y':
         rot_gate = pqc.R_y
@@ -321,7 +321,11 @@ def gen_fSim_circuit(p, N, rotator='y'):
         if N % 2 == 0:
             offset = l % 2
             for i in range(offset, N, 2):
-                layer.append(pqc.fSim([i, (i+1)%N], N))
+                if fixed is True:
+                    gate = pqc.fixed_fSim([i, (i+1)%N], N)
+                else:
+                    gate = pqc.fSim([i, (i+1)%N], N)
+                layer.append(gate)
         else:
             offset = l % N
             loop_at_boundary = offset % 2
@@ -337,7 +341,11 @@ def gen_fSim_circuit(p, N, rotator='y'):
             connect_indices = [(i, i + 1) for i in range(0, len(indices), 2)]
             pairs = pairs + [(indices[i], indices[j]) for i, j in connect_indices]
             for pair in pairs:
-                layer.append(pqc.fSim([pair[0], pair[1]], N))
+                if fixed is True:
+                    gate = pqc.fixed_fSim([pair[0], pair[1]], N)
+                else:
+                    gate = pqc.fSim([pair[0], pair[1]], N)
+                layer.append(gate)
             layer.append(rot_gate(offset, N))
         layers.append(layer)
     return layers

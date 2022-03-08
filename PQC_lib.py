@@ -579,6 +579,49 @@ class fSim(PRot):
         string = f"{name}({angle1:.2f},{angle2:.2f})@q{self._q1, self._q2}"
         return string
 
+def fixed_fsim_gate(theta, N=None, control=0, target=1):
+    if (control == 1 and target == 0) and N is None:
+        N = 2
+
+    if N is not None:
+        return qt.qip.operations.gate_expand_2toN(fixed_fsim_gate(theta), N, control, target)
+    return qt.Qobj([[1,                   0,                   0,                  0],
+                    [0,       np.cos(theta), -1j * np.sin(theta),                  0],
+                    [0, -1j * np.sin(theta),       np.cos(theta),                  0],
+                    [0,                   0,                   0,                  1]],
+                    dims=[[2, 2], [2, 2]])
+
+def fixed_fsim_gate_d_theta(theta, N=None, control=0, target=1):
+    if (control == 1 and target == 0) and N is None:
+        N = 2
+
+    if N is not None:
+        return qt.qip.operations.gate_expand_2toN(fixed_fsim_gate_d_theta(theta), N, control, target)
+    return qt.Qobj([[1,                   0,                   0,                  0],
+                    [0,       -1 * np.sin(theta), -1j * np.cos(theta),                  0],
+                    [0, -1j * np.cos(theta),      -1 *  np.sin(theta),                  0],
+                    [0,                   0,                   0,                       1]],
+                    dims=[[2, 2], [2, 2]])
+
+class fixed_fSim(PRot):
+    def __init__(self, qs_on, q_N):
+        self._q1, self._q2 = qs_on
+        self._q_N = q_N
+        self._theta = 0
+        self._is_param = True
+        self._param_count = 1
+
+        self._operation = self._set_op()
+
+    def _set_op(self):
+        return fixed_fsim_gate(self._theta, N=self._q_N, control=self._q1, target=self._q2)
+    
+    def derivative(self):
+        return fixed_fsim_gate_d_theta(self._theta, N=self._q_N, control=self._q1, target=self._q2)
+
+    def flip_pauli(self):
+        pass
+
 
 #%% =============================CIRCUIT=============================
 

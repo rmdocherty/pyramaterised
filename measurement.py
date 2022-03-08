@@ -116,7 +116,7 @@ class Measurements():
             F_samples.append(F)
         return F_samples
 
-    def _gen_histo(self, F_samples):
+    def _gen_histo(self, F_samples, filt=0):
         """
         Generate the probability mass histogram (i.e sum(P_pqc) = 1) for the F_samples
         from the PQC.
@@ -124,6 +124,9 @@ class Measurements():
             prob: List of floats, 0 < p < 1 that are probabilities of state pair with Fidelity F
             F: List of floats, 0 < f < 1 that are fidelity midpoints,
         """
+        if filt > 0:
+            F_samples = np.array(F_samples)
+            F_samples = F_samples[F_samples < filt]
         #bin no. = 75 from paper
         prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1))#, range=(0, 1) #used to be 1, could be np.amax(F_samples)
         prob = prob / sum(prob) #normalise by sum of prob or length?
@@ -131,7 +134,7 @@ class Measurements():
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
         return prob, F
 
-    def _expr(self, F_samples, N):
+    def _expr(self, F_samples, N, filt=0):
         if len(F_samples) == 0:
             return 0
         P_pqc, F = self._gen_histo(F_samples)
@@ -286,7 +289,8 @@ class Measurements():
         norm = np.linalg.norm(xi_p, ord=2)
         magic = -1 * np.log(d*norm**2) #should we use log10, ln or log
         if magic > np.log(d + 1) - np.log(2):
-            raise Exception("Magic max exceeded!")
+            print("Magic max (possibly)  exceeded!") #was upper bound wrong?
+            print(magic, magic / (np.log(d + 1) - np.log(2)))
         return magic
 
     def theta_to_magic(self, theta, P_n=[]):

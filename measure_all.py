@@ -94,6 +94,13 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=T
             random.shuffle(init_state)
         tensored = qt.tensor(init_state)
         circuit.initial_state = tensored #need to set half as |1> an half as |0>
+    elif circuit_type == "fixed_fsim":
+        layers = cs.gen_fSim_circuit(p, N, rotator='z', fixed=True)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored
 
     for l in layers:
         circuit.add_layer(l)
