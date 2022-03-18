@@ -100,6 +100,7 @@ dmarkers = []
 lws = []
 ls = []
 all_stds = []
+frame_potentials = []
 
 find_welch = True
 find_eff_h = True
@@ -113,13 +114,16 @@ for c, n_f_dict in fidelity_dict.items():
     exprs = []
     eff_exprs = []
     c_stds = []
+    c_frame_potentials = []
     for str_n, f_arr in n_f_dict.items():
         n = int(str_n)
+        fp = average_F(f_arr, t=2)
         if find_welch is True and find_eff_h is True:
-            d = find_welch_bound(f_arr, 2, n)
+            d = find_welch_bound(f_arr, 4, n)
             eff_H, expr = find_eff_H(f_arr, n, expr=True)
             dummy = Measurements(n)
             adjusted_expr = dummy._expr(f_arr, eff_H)
+            
             if find_errors is True:
                 std = pt.resample(f_arr, 20, 10000, d, dummy)
                 c_stds.append(std)
@@ -128,7 +132,7 @@ for c, n_f_dict in fidelity_dict.items():
             d = 0
             adjusted_expr = Measurements(n)._expr(f_arr, eff_H)
         else:
-            d = find_welch_bound(f_arr, 2, n)
+            d = find_welch_bound(f_arr, 4, n)
             eff_H, expr = 0
             adjusted_expr = Measurements(n)._expr(f_arr, d)
         print(f"{c} eff H = {eff_H}, d = {d}, expr = {expr} for {n} qubits")
@@ -136,6 +140,7 @@ for c, n_f_dict in fidelity_dict.items():
         c_ds.append(d)
         exprs.append(expr)
         eff_exprs.append(adjusted_expr)
+        c_frame_potentials.append(fp)
         #diffs.append(n - eff_H)
         ns.append(n)
     eff_hs.append(c_eff_hs)
@@ -144,6 +149,8 @@ for c, n_f_dict in fidelity_dict.items():
     all_ns.append(ns)
     all_exprs.append(exprs)
     all_stds.append(c_stds)
+    frame_potentials.append(c_frame_potentials)
+    
     if c in ["generic_HE", "qg_circuit", "fsim", "y_CPHASE"]:
         all_diffs.append(diffs)
         all_dns.append(ns)
@@ -199,7 +206,7 @@ plot1D(all_adjusted_exprs, x=all_ns, xlabelstring="N", ylabelstring="Eff Expr", 
 
 
 #%%
-plot1D(eff_hs, x=all_ns, xlabelstring="N", ylabelstring="D", legend=[], 
+plot1D(ds, x=all_ns, xlabelstring="N", ylabelstring="D", legend=[], 
        customMarkerStyle=markers, customlinewidth=[None for i in range(len(fidelity_dict.keys()))], 
        customplot1DLinestyle=[None for i in range(len(fidelity_dict.keys()))], customColorList=colours,
        saveto="plots", dataname="", fontsize=14, legendcol=2, logy=True)
@@ -211,8 +218,20 @@ plot1D(all_diffs, x=all_dns, xlabelstring="N", ylabelstring="N - log$_2$ dim $\\
        customplot1DLinestyle=ls[:4], customColorList=dcolours,
        saveto="plots", dataname="", fontsize=14, legendcol=2)
 
+#%%
 
+plot1D(frame_potentials, x=all_ns, xlabelstring="N", ylabelstring="Frame potential", legend=[], 
+       customMarkerStyle=markers, customlinewidth=[None for i in range(len(fidelity_dict.keys()))], 
+       customplot1DLinestyle=[None for i in range(len(fidelity_dict.keys()))], customColorList=colours,
+       saveto="plots", dataname="", fontsize=14, legendcol=2, logy=True)
 
+tfim_fps = np.array(frame_potentials[1])
+scaling = np.polyfit(all_ns[1], np.log2(tfim_fps), 1)
+poly = np.poly1d(scaling)
+print(poly(all_ns[1]))
+plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
+plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
+print(scaling)
 #%%
 plt.figure("4 q plot")
 N = 2**4
@@ -369,14 +388,6 @@ plot1D(c_eff_hs, x=x_data, xlabelstring="K", ylabelstring="dim $\\mathcal{H}_{ef
        customplot1DLinestyle=["-", "-", "--"], customColorList=colours,
        saveto="plots", dataname="combinatorial", fontsize=18, legendcol=1)
 
-#%%
-
-#%%
-# for n in [2, 4, 6]:
-#     for i, c in enumerate(to_load):    
-#         expr_arr = pt.get_data_array_from_dict(cd, "F", fixed_N=n)[1]
-#         eff_H = find_eff_H(expr_arr[i][0], n)
-#         print(f"{c} eff H = {eff_H} for {N} qubits")
 
 
 #%%
@@ -393,4 +404,63 @@ plt.legend()
 
 #%%
 
+N = 2
 
+to_load = [ "clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "fixed_fsim"]
+d_cd = pt.load_data(to_load, qubit_range=(4, 5), depth_range=(1, 31), loc="deep_circuits")
+#ecd = pt.load_data(to_load, qubit_range=(8, 9), depth_range=(30, 31), loc="exprs")
+expr_arr = pt.get_data_array_from_dict(d_cd, "F", fixed_N=N)[1]
+
+
+#%%
+depth_fidelity_dict = {"clifford": {}, "TFIM": {}, "XXZ": {}, "generic_HE": {}, "qg_circuit": {},
+                       "fsim": {}, "fermionic": {}, "y_CPHASE": {}, "zfsim" : {}, "fixed_fsim": {}}
+#d_cd["clifford"][0][1]["Circuit_data"]["Expr"]
+N = 4
+#expr_arr = pt.get_data_array_from_dict(d_cd, "F", fixed_N=4)
+print(N, len(expr_arr[0]))
+for d in range(1, 30):
+    for c, circuit_dict in d_cd.items():
+        print(c, d)
+        data = circuit_dict[0][d]["Circuit_data"]["Expr"]
+        if e == []:
+            pass
+        else:
+            depth_fidelity_dict[c][str(d)] = data
+
+#%%
+f_vs_depth = []
+w_vs_depth = []
+
+for c, d_f_list in depth_fidelity_dict.items():
+    circuit_f_vs_depth = []
+    circuit_w_vs_depth = []
+    for d, p_f_arr in d_f_list.items():
+        welch = find_welch_bound(p_f_arr, 2, n)
+        eff_H, expr = find_eff_H(p_f_arr, n, expr=True)
+        circuit_f_vs_depth.append(eff_H)
+        circuit_w_vs_depth.append(welch)
+        print(f"{c} {d} {eff_H}")
+    f_vs_depth.append(circuit_f_vs_depth)
+    w_vs_depth.append(circuit_w_vs_depth)
+
+#%%
+all_ps = [range(1,30) for i in range(len(depth_fidelity_dict.keys()))]
+plot1D(f_vs_depth, x=all_ps, xlabelstring="N", ylabelstring="dim $\\mathcal{H}_{eff}$", legend=[], 
+       customMarkerStyle=markers, customlinewidth=lws, 
+       customplot1DLinestyle=ls, customColorList=colours,
+       saveto="plots", dataname="", fontsize=14, legendcol=2, logy=True) #dataname=eff_dim_h_up_to_10
+
+#N_range = np.arange(2, 14, 2)
+#exp = 2**N_range
+#plt.gca().plot(N_range, exp, label="$\\mathcal{H}_{\mathrm{full}} = 2^{N}$", color="#63768D", ls="--", lw=1)
+#nck = scipy.special.comb(N_range, N_range // 2)
+#plt.gca().plot(N_range, nck, label="$\\mathcal{H}_{\mathrm{sym}} = \\mathrm{N\:choose\:k}$", color="red", ls="--", lw=1)
+
+plt.xlim(-0.1, 30)
+plt.legend(fontsize=18)
+#%%
+plot1D(w_vs_depth, x=all_ps, xlabelstring="N", ylabelstring="$D$", legend=[], 
+       customMarkerStyle=markers, customlinewidth=lws, 
+       customplot1DLinestyle=ls, customColorList=colours,
+       saveto="plots", dataname="", fontsize=14, legendcol=2, logy=True) #dataname=eff_dim_h_up_to_10

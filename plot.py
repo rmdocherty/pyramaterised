@@ -111,7 +111,9 @@ def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14), loc="c
                 elif n_qubits > 7 and depth_range == (30,31) and c in ["fixed_fsim"]:
                     file_data = load_file(c, n_qubits, 220, loc=loc)
                 elif n_qubits == 8 and depth_range == (30,31):
-                    file_data = load_file(c, n_qubits, 50, loc=loc) #set to 50 for expr, 30 for everyhting else
+                    file_data = load_file(c, n_qubits, 30, loc=loc) #set to 50 for expr, 30 for everyhting else
+                elif n_qubits > 7 and depth_range == (30,31) and c in ["XXZ"]:
+                    file_data = load_file(c, n_qubits, 160, loc=loc)
                 elif n_qubits > 8 and depth_range == (30,31) and c in ["fsim", "zfsim", "XXZ"]:
                     file_data = load_file(c, n_qubits, 160, loc=loc)
                 elif n_qubits > 8 and depth_range == (30,31) and c in ["clifford"]:
@@ -128,7 +130,7 @@ def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14), loc="c
 def get_values_from_circuit_data(data_dict, quantity, index_n=0):
     N = index_n + 2
 
-    if quantity in ["QFIM_e-vals", "avg_e-vals", "std_e-vals"]:
+    if quantity in ["QFIM_e-vals", "avg_e-vals", "std_e-vals", "QFIM_e-vals_dist"]:
         val = data_dict["QFIM_e-vals"]
     elif quantity == "F":
         val = data_dict["Expr"]
@@ -162,6 +164,9 @@ def get_values_from_circuit_data(data_dict, quantity, index_n=0):
         avg = np.mean(non_zeros)
         std = np.std(non_zeros)
     elif quantity == "F":
+        avg = val
+        std = 0
+    elif quantity == "QFIM_e-vals_dist":
         avg = val
         std = 0
     else:
@@ -404,9 +409,9 @@ if __name__ == "__main__":
     plt.gca().legend(labels=new_legend, fontsize=16)
     
     #%%
-    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "clifford"]
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "clifford", "fixed_fsim"]
     cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
-    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=False, logy=True, fontsize=12)
+    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=False, logy=True, logx=True, fontsize=12)
     plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=True, add_legend=True, fontsize=12, figcols=1)
     #plot_data(cd, "Ent", fixed_depth=-1  , save=True, add_legend=True, fontsize=12)
     #%%
