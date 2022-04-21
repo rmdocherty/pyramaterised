@@ -193,6 +193,13 @@ def y_CPHASE(p, N):
         layers.append(layer)
     return layers
 
+def double_y_CPHASE(p, N):
+    layers = []
+    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
+    for i in range(p):
+        layers.append(layer)
+    return layers
+
 # ============================== PROBLEM INPSIRED CIRCUITS ==============================
 
 

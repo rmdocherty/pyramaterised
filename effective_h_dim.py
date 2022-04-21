@@ -15,6 +15,7 @@ import plot as pt
 from t_plot import plot1D
 import matplotlib.pyplot as plt
 from measurement import Measurements
+from helper_functions import genFockOp
 
 
 N = 2
@@ -23,6 +24,7 @@ to_load = [ "clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "ferm
 cd = pt.load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
 #ecd = pt.load_data(to_load, qubit_range=(8, 9), depth_range=(30, 31), loc="exprs")
 expr_arr = pt.get_data_array_from_dict(cd, "F", fixed_N=N)[1]
+
 
 
 #%%
@@ -118,6 +120,7 @@ for c, n_f_dict in fidelity_dict.items():
     for str_n, f_arr in n_f_dict.items():
         n = int(str_n)
         fp = average_F(f_arr, t=2)
+        
         if find_welch is True and find_eff_h is True:
             d = find_welch_bound(f_arr, 4, n)
             eff_H, expr = find_eff_H(f_arr, n, expr=True)
@@ -177,6 +180,35 @@ plt.gca().plot(N_range, nck, label="$\\mathcal{H}_{\mathrm{sym}} = \\mathrm{N\:c
 plt.xlim(1.5, 10.5)
 plt.legend(fontsize=18)
 #%%
+to_load = ["clifford","XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "TFIM", "fermionic", "y_CPHASE",  "fixed_fsim"]
+cd = pt.load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
+magic_arr = pt.get_data_array_from_dict(cd, "raw_magic", fixed_d=-1)[1]
+#%%
+scaled = []
+bad_ns = []
+
+for i, c in enumerate(magic_arr):
+    scaled_c = []
+    c_n = []
+    for k, m in enumerate(c):
+        if np.isnan(m) == False:
+            try:
+                eff_h = eff_hs[i][k]
+                scaled_haar_m = np.log(3 + eff_h) - np.log(4)
+                scaled_c.append(m / scaled_haar_m)
+                c_n.append(all_ns[i][k])
+            except:
+                pass
+    bad_ns.append(c_n)
+    scaled.append(scaled_c)
+#colours = [v for k,v in colours.items()]
+colours = list(colours)
+
+plot1D(scaled, x=bad_ns, xlabelstring="N", ylabelstring="$\\mathcal{M}_{scaled}$", legend=[], 
+       customMarkerStyle=markers, 
+       customplot1DLinestyle=ls, customColorList=colours,
+       saveto="plots", dataname="", fontsize=14, legendcol=2) 
+#%%
 plot1D(ds, x=all_ns, xlabelstring="N", ylabelstring="D", legend=[], 
        customMarkerStyle=markers, customlinewidth=lws, 
        customplot1DLinestyle=ls, customColorList=colours,
@@ -193,13 +225,13 @@ plt.legend(fontsize=18)
 
 #%%
 # problem: load data is loading the 30q samples that odnt have expr measurements - soln: copy the 10 qubit measuremnts you want itno expr and use the ecd solution you used to have!
-plot1D(all_exprs, x=all_ns, xlabelstring="N", ylabelstring="Expr", legend=fidelity_dict.keys(), 
+plot1D(all_exprs, x=all_ns, xlabelstring="N", ylabelstring="Expr, $D_{KL}$", legend=[], 
        customMarkerStyle=markers, customlinewidth=lws, 
        customplot1DLinestyle=ls, customColorList=colours,
        saveto="plots", dataname="exprs", fontsize=14, legendcol=2, logy=True)
 #%%
 # problem: load data is loading the 30q samples that odnt have expr measurements - soln: copy the 10 qubit measuremnts you want itno expr and use the ecd solution you used to have!
-plot1D(all_adjusted_exprs, x=all_ns, xlabelstring="N", ylabelstring="Eff Expr", legend=fidelity_dict.keys(), 
+plot1D(all_adjusted_exprs, x=all_ns, xlabelstring="N", ylabelstring="Expr$_{eff}$, $D_{KL}$", legend=[], 
         customMarkerStyle=markers, customlinewidth=lws, 
         customplot1DLinestyle=ls, customColorList=colours,
         saveto="plots", dataname="exprs", fontsize=14, legendcol=2, logy=True, custom_error_y=all_stds)
@@ -219,9 +251,31 @@ plot1D(all_diffs, x=all_dns, xlabelstring="N", ylabelstring="N - log$_2$ dim $\\
        saveto="plots", dataname="", fontsize=14, legendcol=2)
 
 #%%
+adjusted_fp = []
+for count, c in enumerate(frame_potentials):
+    #print(count)
+    adj_c_fp = []
+    for N, f in enumerate(c):
+        n = all_ns[count][N]
+        #Z0 = genFockOp(qt.sigmaz(), 0, n, 2)
+        #Z1 = genFockOp(qt.sigmaz(), 1, n, 2)
+        #H = Z0 * Z1
+        #H_mag = (H.dag() * H)
+        #H_mag = H_mag.sqrtm()
+        schatten_norm = 2**n#(H_mag*H_mag).tr()#H.norm()#np.trace(H_mag)
+        #schatten_norm = schatten_norm.sqrtm()
+        #print(schatten_norm)
+        offset = welch(2**n)
+        if f < offset:
+            print(f, offset, np.abs(f - offset))
+        adj_c_fp.append(4 * np.sqrt(np.abs(f - offset)) * schatten_norm)
+    adjusted_fp.append(adj_c_fp)
 
-plot1D(frame_potentials, x=all_ns, xlabelstring="N", ylabelstring="Frame potential", legend=[], 
-       customMarkerStyle=markers, customlinewidth=[None for i in range(len(fidelity_dict.keys()))], 
+
+#%%
+
+plot1D(adjusted_fp, x=all_ns, xlabelstring="N", ylabelstring="4$\epsilon$H", legend=[], 
+       customMarkerStyle=markers, customlinewidth=[4 for i in range(len(fidelity_dict.keys()))], 
        customplot1DLinestyle=[None for i in range(len(fidelity_dict.keys()))], customColorList=colours,
        saveto="plots", dataname="", fontsize=14, legendcol=2, logy=True)
 
@@ -229,8 +283,8 @@ tfim_fps = np.array(frame_potentials[1])
 scaling = np.polyfit(all_ns[1], np.log2(tfim_fps), 1)
 poly = np.poly1d(scaling)
 print(poly(all_ns[1]))
-plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
-plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
+#plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
+#plt.gca().plot(all_ns[1], 2**-(np.array(all_ns[1])/2), color="red", ls="--")
 print(scaling)
 #%%
 plt.figure("4 q plot")
@@ -249,23 +303,68 @@ plt.xlabel("Fidelity", fontsize=18)
 plt.ylabel("Probability", fontsize=18)
 plt.legend(fontsize=16)
 
-
+#%%
 plt.figure("4 q plot generic")
 N = 2**4
-plt.title("generic_HE Circuit fidelity dist., N = 4", fontsize=20)
+plt.title("generic_HE $F$ distribution, 4 qubits", fontsize=20)
 F_samples = fidelity_dict["generic_HE"]["4"]
+plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1), density=True, label="$P_{PQC}(F, \\theta)$", color=pt.colours["generic_HE"])
 prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1)) #int((75 / 10000) * len(F_samples))
-plt.plot(edges[:-1], prob/np.amax(prob), lw=3, label="Fidelities")
+#plt.plot(edges[:-1], prob/np.amax(prob), lw=3, label="$P_{PQC}(F, \\theta) = F$")
 haar = (N - 1) * ((1 - edges) ** (N - 2))
-plt.plot(edges[:-1], haar[:-1]/np.amax(haar), ls="--", lw=3, label="Haar / Max(Haar)")
+plt.plot(edges[:-1], haar[:-1], ls="--", lw=2, label="$P_{Haar}(F) = (15)(1-F)^{14}$", color="orange") #/np.amax(haar)
 #points = np.append(2.0**(-1*np.arange(0, 5)), 0)
 #plt.plot(points, [0 for i in range(len(points))], marker="*", ms=10, ls="None", lw=0, color="red", label="$0, 2^{-n}, n \in 0, .., N$")
 #plt.figure("4 q hist")
 #plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)))
-plt.xlabel("Fidelity", fontsize=18)
-plt.ylabel("Probability", fontsize=18)
+plt.xlabel("$F$", fontsize=18)
+plt.ylabel("Probability Density", fontsize=18)
 plt.legend(fontsize=16)
 
+#%%
+plt.figure("4 q plot generic")
+N = 2**4
+N_real = scipy.special.comb(4, 2)#eff_hs[8][1]
+plt.title("zfSim $F$ distribution, 4 qubits", fontsize=20)
+F_samples = fidelity_dict["zfsim"]["4"]
+plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1), density=True, label="$P_{PQC}(F, \\theta)$", color=pt.colours["zfsim"])
+prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1)) #int((75 / 10000) * len(F_samples))
+#plt.plot(edges[:-1], prob/np.amax(prob), lw=3, label="$P_{PQC}(F, \\theta) = F$")
+haar = (N - 1) * ((1 - edges) ** (N - 2))
+haar_real = (N_real - 1) * ((1 - edges) ** (N_real - 2))
+plt.plot(edges[:-1], haar[:-1], ls="--", lw=2, label="$P_{Haar}(F) = (15)(1-F)^{14}$", color="orange") #/np.amax(haar)
+plt.plot(edges[:-1], haar_real[:-1], ls="--", lw=2, label="$P_{Haar,\:eff}(F) = (5)(1-F)^{4}$", color="red") 
+#points = np.append(2.0**(-1*np.arange(0, 5)), 0)
+#plt.plot(points, [0 for i in range(len(points))], marker="*", ms=10, ls="None", lw=0, color="red", label="$0, 2^{-n}, n \in 0, .., N$")
+#plt.figure("4 q hist")
+#plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)))
+plt.xlabel("$F$", fontsize=18)
+plt.ylabel("Probability Density", fontsize=18)
+plt.legend(fontsize=16)
+
+
+
+#%%
+#%%
+plt.figure("4 q plot generic")
+N = scipy.special.comb(4, 2)#2**4
+plt.title("generic_HE Circuit $F$ distribution, N = 4", fontsize=20)
+F_samples = fidelity_dict["fermionic"]["4"]
+plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1), density=True, label="$P_{PQC}(F, \\theta) = F$")
+prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0,1)) #int((75 / 10000) * len(F_samples))
+#plt.plot(edges[:-1], prob/np.amax(prob), lw=3, label="$P_{PQC}(F, \\theta) = F$")
+haar = (N - 1) * ((1 - edges) ** (N - 2))
+plt.plot(edges[:-1], haar[:-1], ls="--", lw=2, label="$P_{Haar}(F) = 3(1-F)^{2}$") #/np.amax(haar)
+#points = np.append(2.0**(-1*np.arange(0, 5)), 0)
+#plt.plot(points, [0 for i in range(len(points))], marker="*", ms=10, ls="None", lw=0, color="red", label="$0, 2^{-n}, n \in 0, .., N$")
+#plt.figure("4 q hist")
+#plt.hist(F_samples, bins=int((75 / 10000) * len(F_samples)))
+plt.xlabel("$F$", fontsize=18)
+plt.ylabel("Probability Density", fontsize=18)
+plt.legend(fontsize=16)
+
+
+#%%
 
 plt.figure("6 q plot")
 plt.title("Clifford Circuit fidelity dist., N = 6", fontsize=20)

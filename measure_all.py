@@ -77,6 +77,8 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=T
         layers = cs.clifford_HE(p, N)
     elif circuit_type == "y_CPHASE":
         layers = cs.y_CPHASE(p, N)
+    elif circuit_type == "double_y_CPHASE":
+        layers = cs.double_y_CPHASE(p, N)
     elif circuit_type == "fermionic":
         layers = cs.gen_fermionic_circuit(p, N)
         init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
@@ -84,6 +86,13 @@ def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=T
             random.shuffle(init_state)
         tensored = qt.tensor(init_state)
         circuit.initial_state = tensored #need to set half as |1> an half as |0>
+    elif circuit_type == "zfsim":
+        layers = cs.gen_fSim_circuit(p, N, rotator='z')
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored 
     elif circuit_type == "fsim":
         if rotator in ['x', 'y', 'z']:
             layers = cs.gen_fSim_circuit(p, N, rotator=rotator)

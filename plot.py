@@ -104,8 +104,8 @@ def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14), loc="c
             for n_layers in range(depth_range[0], depth_range[1]):
                 if c in ["XXZ", "TFIM", "fsim", "zfsim", "fermionic", "fixed_fsim"] and n_qubits % 2 == 1:
                     file_data = []
-                elif n_qubits == 8 and c == "XXZ" and depth_range == (30,31):
-                    file_data = load_file(c, n_qubits, 160, loc=loc)
+                elif n_qubits > 7 and c == "XXZ" and depth_range == (30,31):
+                    file_data = load_file(c, n_qubits, 50, loc=loc) #chang back to 220 and move old data back alter 50
                 elif n_qubits == 8 and c == "clifford" and depth_range == (30,31):
                     file_data = load_file(c, n_qubits, 50, loc=loc)
                 elif n_qubits > 7 and depth_range == (30,31) and c in ["fixed_fsim"]:
@@ -113,7 +113,7 @@ def load_data(circuits_to_load, qubit_range=(2, 13), depth_range=(1, 14), loc="c
                 elif n_qubits == 8 and depth_range == (30,31):
                     file_data = load_file(c, n_qubits, 30, loc=loc) #set to 50 for expr, 30 for everyhting else
                 elif n_qubits > 7 and depth_range == (30,31) and c in ["XXZ"]:
-                    file_data = load_file(c, n_qubits, 160, loc=loc)
+                    file_data = load_file(c, n_qubits, 220, loc=loc)
                 elif n_qubits > 8 and depth_range == (30,31) and c in ["fsim", "zfsim", "XXZ"]:
                     file_data = load_file(c, n_qubits, 160, loc=loc)
                 elif n_qubits > 8 and depth_range == (30,31) and c in ["clifford"]:
@@ -132,8 +132,14 @@ def get_values_from_circuit_data(data_dict, quantity, index_n=0):
 
     if quantity in ["QFIM_e-vals", "avg_e-vals", "std_e-vals", "QFIM_e-vals_dist"]:
         val = data_dict["QFIM_e-vals"]
+    elif quantity == "Gradients_full":
+        val = data_dict["Gradients"]
     elif quantity == "F":
         val = data_dict["Expr"]
+    elif quantity == "raw_magic":
+        val = data_dict["Reyni"]
+    elif quantity == "raw_GKP":
+        val = data_dict["Reyni"]
     else:
         val = data_dict[quantity]
 
@@ -144,14 +150,26 @@ def get_values_from_circuit_data(data_dict, quantity, index_n=0):
             std = resample(val, 20, 10000, 2**N, dummy)
         else:
             avg, std = 0, 0
+    elif quantity == "Gradients_full":
+        avg = val
+        std = 0
     elif quantity == "Gradients":
         grad_list = np.array(val).flatten()
         avg = np.var(grad_list)
         std = 0
     elif quantity == "Reyni":
-        haar_m = np.log(3 + 2**N) - np.log(4)
+        #n_red = sp.special.comb(N, N//2)
+        haar_m = np.log(3 + 2**N) - np.log(4) #was 2**N
         avg = np.mean(val) / haar_m
         std = (np.std(val) / haar_m)
+    elif quantity == "raw_magic":
+        #n_red = sp.special.comb(N, N//2)
+        haar_m = 1 #was 2**N
+        avg = np.mean(val) / haar_m
+        std = (np.std(val) / haar_m)
+    elif quantity == "raw_GKP":
+        avg = np.mean(val) #/ haar_m
+        std = np.std(val) #/ haar_m
     elif quantity == "GKP":
         haar_m = haars[index_n][0]
         avg = np.mean(val) / haar_m
@@ -221,11 +239,11 @@ def map_style_dict_to_list(loaded_circuits, style_dict):
         style_list.append(style_dict[c])
     return style_list
 
-
-markers = {"TFIM": 'p', "XXZ": 'x', "generic_HE": 'h', "fsim": 'o', "fermionic": 's', "Circuit_9": '$9$', "qg_circuit": '^', "y_CPHASE": '1', "zfsim": '*', "NPQC": 'v', "clifford": "8", "fixed_fsim": '>'}
-colours = {"TFIM": "#5ADBFF", "XXZ": "#235789", "generic_HE": "#C1292E", "fsim": "#F1D302", "fermionic": "#E9BCB7", "qg_circuit": "#139A43", "Circuit_9": "#FF8552", "y_CPHASE": "orange", "NPQC": "#395756", "zfsim": "#A67DB8", "clifford": "#854b00", "fixed_fsim": '#4DA1A9'}
-label_dict = {"Expr": "Expr, $D_{KL}$", "Ent": "Entanglement", "Reyni": "$\\mathcal{M}_{2} / \\mathcal{M}_{\mathrm{Haar}}$", "GKP": "$\\mathcal{G} \\mathrm{ / N} $", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "$G_{c}$"}
-title_dict = {"Expr": "Expressibility", "Ent": "Entanglement", "Reyni": "Reyni Entropy of Magic", "GKP": "GKP Magic ", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "Effective quant"}
+#%%
+markers = {"TFIM": 'p', "XXZ": 'x', "generic_HE": 'h', "fsim": 'o', "fermionic": 's', "Circuit_9": '$9$', "qg_circuit": '^', "y_CPHASE": '1', "zfsim": '*', "NPQC": 'v', "clifford": "8", "fixed_fsim": '>', "double_y_CPHASE": '$YY$'}
+colours = {"TFIM": "#5ADBFF", "XXZ": "#235789", "generic_HE": "#C1292E", "fsim": "#F1D302", "fermionic": "#E9BCB7", "qg_circuit": "#139A43", "Circuit_9": "#FF8552", "y_CPHASE": "orange", "NPQC": "#395756", "zfsim": "#A67DB8", "clifford": "#854b00", "fixed_fsim": '#4DA1A9', "double_y_CPHASE": "#00ffcc"}
+label_dict = {"Expr": "Expr, $D_{KL}$", "Ent": "Entanglement", "raw_magic": "$\\mathcal{M}_{2}$", "raw_GKP": "$\\mathcal{G}$", "Reyni": "$\\mathcal{M}_{2} / \\mathcal{M}_{\mathrm{Haar}}$", "GKP": "$\\mathcal{G} / \\mathcal{G}_{\mathrm{Haar}} $", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "$G_{c}$"}
+title_dict = {"Expr": "Expressibility", "Ent": "Entanglement", "Reyni": "Reyni Entropy of Magic", "raw_magic": "$\\mathcal{M}_{2}$", "GKP": "GKP Magic ", "Capped_e-vals": "Capped Eigenvalues", "Gradients": "Var{Grad}", "QFIM_e-vals": "Effective quant"}
 
 
 to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "NPQC", "y_CPHASE", "zfsim"]
@@ -286,7 +304,7 @@ def plot_data(circuit_dict, quantity, fixed_N=0, fixed_depth=0, logx=False,
                 ebars[0].append(y_err_bot)
             cfill = [x_points, y1_points, y2_points, [], error_op] #was 0.1
             ebars = np.array(ebars)
-            print(ebars.shape)
+            #print(ebars.shape)
             e_bars_y.append(ebars)
             fill_between.append(cfill)
     else:
@@ -296,21 +314,26 @@ def plot_data(circuit_dict, quantity, fixed_N=0, fixed_depth=0, logx=False,
            customMarkerStyle=marker_list, customlinewidth=[4 for i in range(len(to_load))], 
            customplot1DLinestyle=["-" for i in range(len(to_load))], customColorList=colour_list,
            logy=logy, logx=logx, saveto=save_path, dataname=dataname, fontsize=fontsize, legendcol=figcols,
-            custom_error_y=e_bars_y, errorcapsize=None, fillbetween=fill_between) #fillbetween=fill_between
+            custom_error_y=[], errorcapsize=None, fillbetween=fill_between) #fillbetween=fill_between, e_bars_y
+
+#%%
+def f(theta, d):
+    return (7*d**2 - 3*d + d*(d+3)*np.cos(4*theta) - 8) / (8*(d**2 - 1))
+
 
 #%%
 
 if __name__ == "__main__":
-    to_load = ["generic_HE", "qg_circuit",  "fermionic", "y_CPHASE", "TFIM", "XXZ", "fsim","zfsim",  ]
+    to_load = ["generic_HE", "qg_circuit",  "fermionic", "y_CPHASE", "TFIM", "XXZ", "fsim","zfsim", "clifford", "fixed_fsim" ]
     cd = load_data(to_load, qubit_range=(2, 10), loc="deep_circuits")
     
     #plot_data(cd, "Expr", fixed_N=4, logy=True, save=False, add_legend=False, errors=True)
     #%%
-    plot_data(cd, "Reyni", fixed_N=4, save=False, add_legend=False, errors=True)
-    plot_data(cd, "GKP", fixed_N=4, save=False, add_legend=False)
+    plot_data(cd, "Reyni", fixed_N=4, save=False, add_legend=False, errors=True, error_op=0.2)
+    plot_data(cd, "GKP", fixed_N=4, save=False, add_legend=False, errors=True, error_op=0.2)
     
     #%%
-    plot_data(cd, "Ent", fixed_N=4, save=True, add_legend=True, fontsize=16, figcols=2)
+    plot_data(cd, "Ent", fixed_N=4, save=True, add_legend=False, errors=False, fontsize=16, figcols=2)
     
     #%%
     cd = load_data(to_load, qubit_range=(2, 11))
@@ -331,8 +354,8 @@ if __name__ == "__main__":
     #%%
     to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
     cd = load_data(to_load, qubit_range=(2, 9))
-    plot_data(cd, "Reyni", fixed_depth=1 , save=False, add_legend=False)
-    plot_data(cd, "GKP", fixed_depth=1, save=False, add_legend=False)
+    plot_data(cd, "Reyni", fixed_depth=-1 , save=False, add_legend=False)
+    plot_data(cd, "GKP", fixed_depth=-1, save=False, add_legend=False)
     
     #%%
     #cd = load_data(to_load, qubit_range=(2, 11))
@@ -367,18 +390,64 @@ if __name__ == "__main__":
             plot_data(temp_cd, "QFIM_e-vals", fixed_depth=-1, logy=True, logx=True, save=True, add_legend=True)
     
     #%%
-    to_load = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "TFIM", "fermionic", "y_CPHASE", "clifford", "fixed_fsim"]
-    cd = load_data(to_load, qubit_range=(2, 9), depth_range=(30, 31), loc="deep_circuits")
-    
-    plot_data(cd, "Reyni", fixed_depth=-1 , save=False, add_legend=True, fontsize=12)
-    plot_data(cd, "GKP", fixed_depth=-1 , save=False, add_legend=True, fontsize=12)
+    to_load = ["clifford","XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "TFIM", "fermionic", "y_CPHASE", "fixed_fsim"]
     cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
-    plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=False, add_legend=False, logy=True, fontsize=12)
+    
+    k_doped_magic = []
+    for n in range(2, 11):
+        n_prime = n # + 1
+        d = 2**n_prime
+        k_doped_linear_magic = 1 - ((3 + d)**(-1)) * (4 + (d - 1) * f(np.pi / 4, d)**n_prime)
+        haar_random_magic = np.log(3 + d) - np.log(4)
+        k_doped_reyni_maigc = 0.287682 * n_prime #-1 * np.log(1 - k_doped_linear_magic)
+        k_doped_magic.append(k_doped_reyni_maigc) #/ haar_random_magic)
+    
+    #plot_data(cd, "Reyni", fixed_depth=-1 , save=False, add_legend=False, errors=True, fontsize=12)
+    
+    plot_data(cd, "raw_GKP", fixed_depth=-1 , save=False, add_legend=False, errors=False, fontsize=12)
+    plt.plot(range(2,11), k_doped_magic, color='red', ls='--')
+    #plot_data(cd, "GKP", fixed_depth=-1 , save=False, add_legend=False, errors=True, fontsize=12)
+    #%%
+    cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
+    plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=False, add_legend=False, logy=True, logx=True, fontsize=12)
     
     plot_data(cd, "Ent", fixed_depth=-1 , save=False, add_legend=True, fontsize=12)
     #plot_data(cd, "Expr", fixed_depth=-1 , save=False, add_legend=True, fontsize=12, logy=True)
-    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=True, fontsize=12, logy=True)
+    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=False, fontsize=12, logy=True, errors=True)
     #plot_data(cd, "GKP", fixed_depth=-1, save=True, add_legend=False)
+    #%%
+    to_load = [ "clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "fixed_fsim"]
+    cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
+    
+    plot_data(cd, "raw_magic", fixed_depth=-1 , save=False, add_legend=False, errors=False, fontsize=12)
+    eff_hs = [[3.3551724385378825, 7.724355786265522, 15.898795065718788, 31.80386869018554, 62.714355733911326, 244.47661464379777], 
+              [1.9908171919816675, 3.8205476155104674, 7.546750623782839, 15.115023088086364], 
+              [1.724662470264362, 3.0856559718342584, 11.352085038194584, 36.29230146692038], 
+              [4.010391511884774, 7.991617699799811, 15.941460348051026, 31.918855521981534, 64.03357672904184, 255.5907743364044], 
+              [4.003133316413363, 8.00756395772601, 15.996594970328255, 31.958894812436277, 64.09401629518852, 255.82468570479475], 
+              [3.9979148398113793, 16.00324522833607, 64.0654164455534, 255.75221967020974], 
+              [1.7297544760141896, 5.399694655965848, 18.890206546114342, 68.21635767134372],
+              [3.6000247940363272, 7.476882466123934, 15.236874657907418, 31.008558587945814, 62.98641358743481, 250.7882374720639], 
+              [1.9996367010183704, 6.015853373493843, 20.048421794358642, 70.09445648985545],
+              [1.9982807846194572, 5.930496087338608, 19.82276876519388, 69.69068242197156]]
+    bad_ns = [[2, 3, 4, 5, 6, 8], 
+              [2, 4, 6, 8], 
+              [2, 4, 6, 8],
+              [2, 3, 4, 5, 6, 8],
+              [2, 3, 4, 5, 6, 8],
+              [2, 4, 6, 8], 
+              [2, 4, 6, 8], 
+              [2, 3, 4, 5, 6, 8], 
+              [2, 4, 6, 8], 
+              [2, 4, 6, 8]]
+    for count, i in enumerate(eff_hs):
+        npa = np.array(i)
+        haar_m = np.log(3 + npa) - np.log(4)
+        plt.plot(bad_ns[count], haar_m, color=colours[to_load[count]], zorder=10, ls="--", lw=3, marker="None")
+    #%%
+    to_load = ["clifford","XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "TFIM", "fermionic", "y_CPHASE"]
+    cd = load_data(to_load, qubit_range=(4, 5), depth_range=(1, 30), loc="deep_circuits")
+    plot_data(cd, "Ent", fixed_N=4, save=False, add_legend=True, fontsize=12)
     #%%
     to_load = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "TFIM", "fermionic", "y_CPHASE", "clifford", "fixed_fsim"]
     cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
@@ -397,7 +466,7 @@ if __name__ == "__main__":
     #plt.gca().legend(labels=new_legend, handles=["TFIM", "fermionic", "y_CPHASE"], fontsize=14, ncol=2)
     
     #%%
-    to_load = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim"]
+    to_load = ["XXZ", "generic_HE", "qg_circuit", "fsim", "zfsim", "fixed_fsim"]
     cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
     plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=False, add_legend=True, logy=True, fontsize=12)
     #%%
@@ -409,10 +478,10 @@ if __name__ == "__main__":
     plt.gca().legend(labels=new_legend, fontsize=16)
     
     #%%
-    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "clifford", "fixed_fsim"]
-    cd = load_data(to_load, qubit_range=(2, 11), depth_range=(30, 31), loc="deep_circuits")
-    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=False, logy=True, logx=True, fontsize=12)
-    plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=True, add_legend=True, fontsize=12, figcols=1)
+    to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "clifford"]
+    cd = load_data(to_load, qubit_range=(2, 9), depth_range=(30, 31), loc="deep_circuits")
+    plot_data(cd, "Gradients", fixed_depth=-1 , save=False, add_legend=False, logy=True, fontsize=12, figcols=2)
+    plot_data(cd, "QFIM_e-vals", fixed_depth=-1 , save=False, add_legend=True, logy=True, logx=True, fontsize=12, figcols=2)
     #plot_data(cd, "Ent", fixed_depth=-1  , save=True, add_legend=True, fontsize=12)
     #%%
     to_load = ["clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", ]
@@ -426,22 +495,23 @@ if __name__ == "__main__":
     #%%
     plt.gca().annotate('High Expr', xy=(-0.4, 1), xycoords='axes fraction', xytext=(-0.4, 0), arrowprops=dict(arrowstyle="<->", color='black'))
     #%%
-    to_load = ["clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]
+    to_load = ["clifford", "TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim", "fixed_fsim"]
     cd = load_data(to_load, qubit_range=(2, 9), depth_range=(30, 31), loc="deep_circuits")
     
     
-    plot_data(cd, "Reyni", fixed_depth=-1  , save=True, add_legend=False, fontsize=12, errors=True, error_op=0.1)
-    custom_lines = [Line2D([0], [0], color=colours["clifford"], marker=markers["clifford"], lw=4)]
-    new_legend= ["clifford"]
-    plt.gca().legend(custom_lines, new_legend, fontsize=18, loc=4)
+    plot_data(cd, "Reyni", fixed_depth=-1  , save=True, add_legend=False, errors=False, error_op=0.2)
+    plot_data(cd, "GKP", fixed_depth=-1  , save=True, add_legend=False, errors=False, error_op=0.2)
+    #custom_lines = [Line2D([0], [0], color=colours["clifford"], marker=markers["clifford"], lw=4)]
+    #new_legend= ["clifford"]
+    #plt.gca().legend(custom_lines, new_legend, fontsize=18, loc=4)
     #plot_data(cd, "Ent", fixed_depth=-1  , save=True, add_legend=False, fontsize=12, errors=True)
     #plot_data(cd, "GKP", fixed_depth=-1 , save=True, add_legend=True, fontsize=12)
     
     #%%
     plot_data(cd, "QFIM_e-vals", fixed_depth=-1  , save=True, add_legend=True, fontsize=12, logy=True, logx=True)
     #%%
-    cd = load_data(to_load, qubit_range=(2, 7), depth_range=(30, 31), loc="deep_circuits")
-    plot_data(cd, "Expr", fixed_depth=-1 , save=True, add_legend=True, fontsize=12, logy=True)
+    cd = load_data(to_load, qubit_range=(2, 9), depth_range=(30, 31), loc="deep_circuits")
+    plot_data(cd, "Expr", fixed_depth=-1 , save=True, add_legend=False, fontsize=12, logy=True, errors=True)
     
     #%%
     to_load = ["TFIM", "XXZ", "generic_HE", "qg_circuit", "fsim", "fermionic", "y_CPHASE", "zfsim"]

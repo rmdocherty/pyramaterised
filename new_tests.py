@@ -26,9 +26,10 @@ random.seed(1) #for reproducibility
 """Single Hadamard gate acting on |0> basis state should just be (sqrt(2), sqrt(2))"""
 test_H = pqc.PQC(1)
 layer = [pqc.H(0, 1)]
+layer=[pqc.fixed_R_y(0, 1, np.pi/2)]
 test_H.add_layer(layer)
 out = test_H.gen_quantum_state()
-
+print(out)
 x_component = np.real(out[1][0][0])
 y_component = np.real(out[0][0][0])
 over_sqrt2 = 1 / np.sqrt(2)
@@ -43,6 +44,7 @@ test_2H.add_layer(layer, n=2)
 out = test_2H.gen_quantum_state()
 assert out == qt.basis(2, 0) #assert throws exception if conditional not true
 print("Action of 2 Hadamards on |0> is |0> again")
+
 
 
 #%% =============================EXPR AND ENT TESTS=============================

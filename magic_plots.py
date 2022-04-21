@@ -91,7 +91,7 @@ p = 150
 N = 4
 d = 2**N
 N_gates = 50
-N_repeats = 100
+N_repeats = 30
 
 all_entropies = []
 all_stds = []
@@ -99,7 +99,7 @@ all_exprs = []
 max_magic = np.log(d + 1) - np.log(2)
 
 #%%
-N_repeats = 10#50
+N_repeats = 50#50
 
 for i in range(N_repeats):
     print(f"Iteration {i}")
@@ -125,18 +125,17 @@ for i in range(N_repeats):
     all_stds.append(stds)
 
 #%%
+from t_plot import plot1D
 
 magics = np.mean(all_entropies, axis=0) / max_magic
 stds = np.std(all_entropies, axis=0) / max_magic
-stderrs = stds / np.sqrt(len(stds))
+stderrs = stds #/ np.sqrt(len(stds))
 n_t_gates = np.array(range(len(magics)))
 default_title = f"T-Gate injection on {N}-qubit, {p}-layer Clifford Circuit"
-plt.figure(default_title.strip(","))
+#plt.figure(default_title.strip(","))
 
 haar_random_magic = np.log(3 + d) - np.log(4)
 normalised_haar = haar_random_magic / max_magic
-plt.hlines(normalised_haar, 0, n_t_gates[-1], lw=2, ls='dotted', label="Haar random magic", color='red')
-plt.errorbar(n_t_gates, magics, yerr=stderrs, lw=4, label=f"Clifford circuit magic, {len(all_entropies)} repeats")
 
 
 def f(theta, d):
@@ -145,9 +144,65 @@ k_doped_linear_magic = 1 - ((3 + d)**(-1)) * (4 + (d - 1) * f(np.pi / 4, d) **n_
 k_doped_reyni_maigc = -1 * np.log(1 - k_doped_linear_magic)
 k_doped_reyni_maigc_normalised = k_doped_reyni_maigc / max_magic
 
-plt.plot(n_t_gates, k_doped_reyni_maigc_normalised, label="Theoretical model", lw=4, ls='--')
-pretty_graph("Number of T gates", "Fractional magic", default_title, 20)
-plt.legend(fontsize=18)
+
+hline_x = np.arange(0, n_t_gates[-1])
+hline_y = [normalised_haar for i in hline_x] 
+hline_err = [0 for i in hline_x]
+model_err = [0 for i in k_doped_reyni_maigc_normalised]
+
+data = [hline_y , k_doped_reyni_maigc_normalised, magics]
+x = [hline_x, n_t_gates, n_t_gates, ]
+stderr = [hline_err, model_err, stderrs]
+ls = ["dotted", "--", "-",]
+colors = ["red", "orange", "cornflowerblue",]
+ms = ["None", "None", "None"]
+lws = [1, 3, 3]
+legend = ["$\\mathcal{M}_{\\mathrm{Haar}}$", "Theoretical Model", f"{len(all_entropies)} repeats",]
+
+x_points = []
+y1_points = []
+y2_points = []
+
+fillb = []
+for error_op in [0, 0, 0.3]:
+    x_points = []
+    y1_points = []
+    y2_points = []
+    for i in range(0, len(data[2])):
+        #print(i, len(data[2]), c, len(data[2][c]))
+        x_points.append(x[2][i])
+        y = data[2][i]
+        std = stderr[2][i]
+        y1 = y + std
+        if y1 > 1 and quantity not in ["Expr", "Renyi", "QFIM_e-vals"]:
+            y1 = 1
+            y_err_top = 1 - y
+        else:
+            y_err_top = std
+        y2 = y - std
+        if y2 < 0:
+            y2 = 0
+            y_err_bot = y
+        else:
+            y_err_bot = std
+        y1_points.append(y1)
+        y2_points.append(y2)
+
+    cfill = [x_points, y1_points, y2_points, [], error_op] #was 0.1
+    fillb.append(cfill)
+
+
+plot1D(data, x, xlabelstring="$k$", ylabelstring="$\\mathcal{M}_{2}$ / max $\\mathcal{M}_{2}$",
+        customplot1DLinestyle=ls, customColorList=colors, legend=legend, #, custom_error_y=stderr
+        customMarkerStyle=ms, customlinewidth=lws, errorcapsize=0, fillbetween=fillb)
+#plt.title("Réyni magic of $k$-doped Clifford circuit")
+#plt.plot(n_t_gates, k_doped_reyni_maigc_normalised, label="Theoretical model", lw=4, ls='--')
+#plt.hlines(normalised_haar, 0, n_t_gates[-1], lw=2, ls='dotted', label="Haar random magic", color='red')
+#plt.errorbar(n_t_gates, magics, yerr=stderrs, lw=4, label=f"Clifford circuit magic, {len(all_entropies)} repeats")
+
+
+#pretty_graph("Number of T gates", "Fractional magic", default_title, 20)
+#plt.legend(fontsize=18)
 
 #%%
 P, N = 4, 4

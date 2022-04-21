@@ -68,3 +68,32 @@ def extend(nested_list):
 def pretty_print_data_dict(data_dict):
     line1 = f"A {data_dict['N_qubit']} qubit, {data_dict['N_layer']} layer {data_dict['Type']}" 
     
+def get_error_bars(xs, ys, stderr, quantity='Renyi', error_op=0.3, crop_top=False, crop_bot=False):
+    x_points = []
+    y1_points = []
+    y2_points = []
+
+    fillb = []
+
+    for i in range(0, len(ys)):
+        #print(i, len(data[2]), c, len(data[2][c]))
+        x_points.append(xs[i])
+        y = ys[i]
+        std = stderr[i]
+        y1 = y + std
+        if y1 > 1 and crop_top:
+            y1 = 1
+            y_err_top = 1 - y
+        else:
+            y_err_top = std
+        y2 = y - std
+        if y2 < 0 and crop_bot:
+            y2 = 0
+            y_err_bot = y
+        else:
+            y_err_bot = std
+        y1_points.append(y1)
+        y2_points.append(y2)
+
+    cfill = [x_points, y1_points, y2_points, [], error_op] #was 0.1
+    return cfill

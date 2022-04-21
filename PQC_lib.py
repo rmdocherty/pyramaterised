@@ -18,7 +18,7 @@ rng = np.random.default_rng(1)
 #%% =============================GATES=============================
 
 
-def iden(N):
+def iden(N, target=0):
     return qt.tensor([qt.qeye(2) for i in range(N)])
 
 
@@ -98,6 +98,14 @@ class PRot(Gate):
         string = f"{name}({angle:.2f})@q{self._q_on}"
         return string
 
+class I(PRot):
+    def _set_properties(self):
+        self._gate = iden
+        self._pauli = iden(self._q_N)
+
+    def _set_op(self):
+        return iden(self._q_N)
+    
 
 class R_x(PRot):
     def _set_properties(self):

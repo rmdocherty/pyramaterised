@@ -7,14 +7,14 @@ Created on Wed Jan 12 13:15:43 2022
 """
 import measure_all as measure
 
-circuits = ["fixed_fsim", "clifford", "qg_circuit", "y_CPHASE"]#["fermionic", "fsim", "zfsim", "XXZ"]
+circuits = ["double_y_CPHASE"]#["fermionic", "fsim", "zfsim", "XXZ"]
 
 for c in circuits:
-    for n in range(4, 5):
+    for n in range(2, 9):
         if n % 2 == 1 and c in ["fermionic", "XXZ", "fsim", "zfsim", "TFIM", "fixed_fsim"]:
             pass
         else:
-            for p in range(1,31):
+            for p in range(30,31):
                 print(c, n, p)
                 if c == "NPQC" and p >= 2**(n // 2):
                     pass
