@@ -342,7 +342,7 @@ class Measurements():
             conv_mat_bp[j_count,:] = (-1)**binary_product
         coeffs = psi.full()[:, 0]
         GKP = 0
-        GKP= np.sum(np.abs(np.dot(np.conjugate(coeffs) * conv_mat_bp, coeffs[conv_mat_add_in]))) / (mag)
+        GKP= np.sum(np.abs(np.dot(coeffs * conv_mat_bp, coeffs[conv_mat_add_in]))) / (mag)
         GKP = np.log2(GKP)
         return GKP
     
@@ -351,59 +351,6 @@ class Measurements():
         QC._quantum_state = QC.run(angles=theta)
         gkp = self.GKP_Magic(QC._quantum_state)
         return -1 * gkp # -1 so we can minize easily
-    
-    # The following fast reyni code is courtesy of txhaug
-    def numberToBase(self, n, b, n_qubits):
-        if n == 0:
-            return np.zeros(n_qubits, dtype=int)
-        digits = np.zeros(n_qubits, dtype=int)
-        counter = 0
-        while n:
-            digits[counter] = int(n % b)
-            n //= b
-            counter += 1
-        return digits[::-1]
-
-    def get_conversion_matrix_mod_add_index(self, base_states):
-        n_qubits = len(base_states[0])
-        mag = len(base_states)
-        to_index = 2**np.arange(n_qubits)[::-1]
-        conversion_matrix = np.zeros([mag, mag], dtype=int)
-        for j_count in range(mag):
-            base_j = base_states[j_count]
-            k_plus_j = np.mod(base_states + base_j, 2)
-            k_plus_j_index = np.sum(k_plus_j * to_index, axis=1)
-            conversion_matrix[j_count, :] = k_plus_j_index
-        return conversion_matrix
-
-    def get_conversion_matrix_binary_prod(self, base_states):
-        mag = len(base_states)
-        conversion_matrix = np.zeros([mag, mag], dtype=int)
-        for i_count in range(mag):
-            base_i = base_states[i_count]
-            binary_product = np.mod(np.dot(base_states, base_i), 2)
-            conversion_matrix[i_count, :] = (-1)**binary_product
-        return conversion_matrix
-
-    def get_conversion_matrices(self):
-        n = self._QC._n_qubits
-        base_states = [self.numberToBase(i, 2, n) for i in range(2**n)]
-        conversion_matrix_binary_prod = self.get_conversion_matrix_binary_prod(base_states)
-        conversion_matrix_mod_add_index = self.get_conversion_matrix_mod_add_index(base_states)
-        return [conversion_matrix_mod_add_index, conversion_matrix_binary_prod]
-
-    def renyi_entropy_fast(self, state, conversion_matrices=None, alpha=2):
-        if conversion_matrices is None:
-            conversion_matrix_mod_add_index, conversion_matrix_binary_prod = self.get_conversion_matrices()
-        else:
-            conversion_matrix_mod_add_index, conversion_matrix_binary_prod = conversion_matrices
-
-        coeffs = state.data.toarray()[:, 0]
-        n_qubits = len(state.dims[0])
-
-        renyi_fast= np.sum(np.abs(2**(-n_qubits/2)*np.dot(np.conjugate(coeffs)*conversion_matrix_binary_prod, coeffs[conversion_matrix_mod_add_index] ))**(2*alpha))
-        renyi_fast = 1/(1-alpha)*np.log(renyi_fast)-np.log(2**n_qubits)
-        return renyi_fast
 
 
     def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True, full_data=False, angles='random'):
