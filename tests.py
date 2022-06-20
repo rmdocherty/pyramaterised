@@ -262,8 +262,8 @@ if test_eff_H:
     for n in range(2, 9, 2): #2, 9, 2
         zfsim = pyqc.templates.generate_circuit("zfsim", n, n)
         zfsim_m = pyqc.measure.Measurements(zfsim)
-        f_samples = zfsim._gen_f_samples(150)
-        eff_H = zfsim.find_eff_H(f_samples, n)
+        f_samples = zfsim_m._gen_f_samples(150)
+        eff_H = zfsim_m.find_eff_H(f_samples, n)
         n_c_k = scipy.special.comb(n, n // 2)
         print(f"|H_eff| for zfsim circuit for {n} qubits is {eff_H:.6f}, should be around {n_c_k}")
         assert isclose(eff_H, n_c_k, rel_tol=0.4)

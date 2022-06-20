@@ -5,20 +5,16 @@ Created on Wed Nov 17 12:19:54 2021
 
 @author: ronan
 """
-import PQC_lib as pqc
+import PQC as pqc
 import qutip as qt
 import numpy as np
 import random
-from measurement import Measurements
-from helper_functions import genFockOp
-
-
 
 # ============================== HE CIRCUITS ==============================
 LEN_CLIFF_STRING = 3
 
 
-def gen_clifford_circuit(p, N, method='random'):
+def clifford_circuit_layers(p, N, method='random'):
     clifford_gates = [pqc.H, pqc.S, pqc.CZ, pqc.CNOT]
     layers = []
     qs = list(range(N))
@@ -97,23 +93,6 @@ def NPQC_layers(p, N):
         layers.append(p_layer)
     return layers, angles
 
-def find_overparam_point(circuit, layer_index_list, epsilon=1e-3):
-    layers_to_add = [circuit.get_layer(i) for i in layer_index_list]
-    prev_rank, rank_diff = 0, 1
-    count = 0
-    while rank_diff > epsilon and count < 1e6:
-        for l in layers_to_add:
-            circuit.add_layer(l)
-        circuit.gen_quantum_state()
-        circuit_m = Measurements(circuit)
-        QFI = circuit_m._get_QFI()
-        rank = np.linalg.matrix_rank(QFI)
-        rank_diff = np.abs(rank - prev_rank)
-        print(f"Iteration {count}, r0={prev_rank}, r1={rank}, delta = {rank_diff}")
-        prev_rank = rank
-        count += 1
-    return count
-
 
 def string_to_entangler(string):
     lower = string.lower()
@@ -130,7 +109,7 @@ def string_to_entangler(string):
     return entangler
 
 
-def circuit_1(p, N):
+def circuit_1_layers(p, N):
     layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)]
     layers = []
     for i in range(p):
@@ -138,7 +117,7 @@ def circuit_1(p, N):
     return layers
 
 
-def circuit_2(p, N, ent_str="cnot"):
+def circuit_2_layers(p, N, ent_str="cnot"):
     entangler = string_to_entangler(ent_str)
     layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
     layers = []
@@ -147,7 +126,7 @@ def circuit_2(p, N, ent_str="cnot"):
     return layers
 
 
-def circuit_9(p, N, ent_str="cphase"):
+def circuit_9_layers(p, N, ent_str="cphase"):
     entangler = string_to_entangler(ent_str)
     layer = [pqc.H(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)] + [pqc.R_x(i, N) for i in range(N)]
     layers = []
@@ -156,7 +135,7 @@ def circuit_9(p, N, ent_str="cphase"):
     return layers
 
 
-def qg_circuit(p, N, ent_str="cnot"):
+def qg_circuit_layers(p, N, ent_str="cnot"):
     entangler = string_to_entangler(ent_str)
     init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
     layer1 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
@@ -169,7 +148,7 @@ def qg_circuit(p, N, ent_str="cnot"):
     return layers
 
 
-def generic_HE(p, N, ent_str="cnot"):
+def generic_HE_layers(p, N, ent_str="cnot"):
     entangler = string_to_entangler(ent_str)
     init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
@@ -178,7 +157,7 @@ def generic_HE(p, N, ent_str="cnot"):
         layers.append(layer)
     return layers
 
-def clifford_HE(p, N, ent_str="cnot"):
+def clifford_HE_layers(p, N, ent_str="cnot"):
     entangler = string_to_entangler(ent_str)
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
     layers = [] 
@@ -186,14 +165,14 @@ def clifford_HE(p, N, ent_str="cnot"):
         layers.append(layer)
     return layers
 
-def y_CPHASE(p, N):
+def y_CPHASE_layers(p, N):
     layers = []
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
     for i in range(p):
         layers.append(layer)
     return layers
 
-def double_y_CPHASE(p, N):
+def double_y_CPHASE_layers(p, N):
     layers = []
     layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
     for i in range(p):
@@ -203,7 +182,7 @@ def double_y_CPHASE(p, N):
 # ============================== PROBLEM INPSIRED CIRCUITS ==============================
 
 
-def gen_TFIM_layers(p, N):
+def TFIM_layers(p, N):
     initial_layer = [pqc.H(i, N) for i in range(N)]
     layers = [initial_layer]
     for i in range(p):
@@ -215,7 +194,7 @@ def gen_TFIM_layers(p, N):
     return layers
 
 
-def gen_modified_TFIM_layers(p, N):
+def modified_TFIM_layers(p, N):
     layers = []
     for i in range(p):
         first_half = [pqc.RR_block(pqc.R_zz, N)]
@@ -232,12 +211,12 @@ def TFIM_hamiltonian(N, g, h=0):
     H = 0
     for i in range(N):
         i_plus = (i + 1) % N
-        H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N) + h * genFockOp(qt.sigmaz(), i, N)
+        H += pqc.genFockOp(qt.sigmaz(), i, N) * pqc.genFockOp(qt.sigmaz(), i_plus, N) + g * pqc.genFockOp(qt.sigmax(), i, N) + h * pqc.genFockOp(qt.sigmaz(), i, N)
     H = -1 * H
     return H
 
 
-def gen_XXZ_layers(p, N, commute=False):
+def XXZ_layers(p, N, commute=False):
     even_indices = []
     odd_indices = []
     for i in range(1, (N // 2) + 1): # -1 to convert from 1 indexed paper defn to 0 indexed qubit lists
@@ -287,7 +266,7 @@ def list_to_pairs(x):
     return pairs
 
 
-def gen_fermionic_circuit(p, N):
+def fermionic_circuit_layers(p, N):
     layers = []
     for j in range(p):
         blocks = []
@@ -311,14 +290,13 @@ def gen_fermionic_circuit(p, N):
     return layers
 
 
-def gen_fSim_circuit(p, N, rotator='y', fixed=False):
+def fSim_circuit_layers(p, N, rotator='y', fixed=False):
     r = rotator.lower()
     if r == 'y':
         rot_gate = pqc.R_y
     elif r == 'x':
         rot_gate = pqc.R_x
     elif r == 'z':
-        print("using z gate as rotator")
         rot_gate = pqc.R_z
     else:
         raise Exception("Please supply a valid single qubit rotator")
@@ -356,3 +334,78 @@ def gen_fSim_circuit(p, N, rotator='y', fixed=False):
             layer.append(rot_gate(offset, N))
         layers.append(layer)
     return layers
+
+def add_layers(circuit, layers):
+    for l in layers:
+        circuit.add_layer(l)
+    return circuit 
+
+
+def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=True):
+    circuit = pqc.PQC(N)
+
+    if circuit_type == "NPQC":
+        layers, theta_ref = NPQC_layers(p, N)
+    elif circuit_type == "TFIM":
+        layers = TFIM_layers(p, N)
+    elif circuit_type == "TFIM_modified":
+        layers = modified_TFIM_layers(p, N)
+    elif circuit_type == "XXZ":
+        layers = XXZ_layers(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored
+    elif circuit_type == "Circuit_1":
+        layers = circuit_1_layers(p, N)
+    elif circuit_type == "Circuit_2":
+        layers = circuit_2_layers(p, N)
+    elif circuit_type == "Circuit_9":
+        layers = circuit_9_layers(p, N)
+    elif circuit_type == "qg_circuit":
+        layers = qg_circuit_layers(p, N)
+    elif circuit_type == "generic_HE":
+        layers = generic_HE_layers(p, N)
+    elif circuit_type == "clifford":
+        layers = clifford_HE_layers(p, N)
+    elif circuit_type == "y_CPHASE":
+        layers = y_CPHASE_layers(p, N)
+    elif circuit_type == "double_y_CPHASE":
+        layers = double_y_CPHASE_layers(p, N)
+    elif circuit_type == "fermionic":
+        layers = fermionic_circuit_layers(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored #need to set half as |1> an half as |0>
+    elif circuit_type == "zfsim":
+        layers = fSim_circuit_layers(p, N, rotator='z')
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored 
+    elif circuit_type == "fsim":
+        if rotator in ['x', 'y', 'z']:
+            layers = fSim_circuit_layers(p, N, rotator=rotator)
+        else:
+            layers = fSim_circuit_layers(p, N)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored #need to set half as |1> an half as |0>
+    elif circuit_type == "fixed_fsim":
+        layers = fSim_circuit_layers(p, N, rotator='z', fixed=True)
+        init_state = [qt.basis(2, 1) for i in range(N // 2)] + [qt.basis(2, 0) for i in range(N // 2, N)]
+        if shuffle:
+            random.shuffle(init_state)
+        tensored = qt.tensor(init_state)
+        circuit.initial_state = tensored
+
+    for l in layers:
+        circuit.add_layer(l)
+
+    return circuit

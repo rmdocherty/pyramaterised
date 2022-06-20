@@ -5,41 +5,31 @@ Created on Sat Aug  7 21:20:44 2021
 
 @author: ronan
 """
+
 import qutip as qt
 import numpy as np
 import scipy
-import pickle
-import matplotlib.pyplot as plt
-from itertools import product, combinations
-from helper_functions import pretty_subplot
 import random
+from itertools import combinations
+from typing import Callable, Tuple, Literal, Dict, Union
+from PQC import PQC, Gradient, QubitNumber
+from gates import Angle
 
 
 class Measurements():
-    def __init__(self, QC, load=False):
-        self._QC = QC
+    def __init__(self, QC: PQC):
+        self.QC: PQC = QC
+        self.minimize_function: Callable
         try:
             self.minimize_function = QC.cost
         except AttributeError:
-            self.minimize_function = 0
-        if load is True:
-            try:
-                with open("pauli_groups.pickle", 'rb') as file:
-                    data = pickle.load(file)
-                    N = QC._n_qubits
-                    self._P_n = data[str(N)]
-            except (FileNotFoundError, KeyError):
-                print("error opening reyni")
-                self._P_n = []
-        else:
-            self._P_n = []
+            self.minimize_function = lambda x: x
 
-    def set_minimise_function(self, function):
+    def set_minimise_function(self, function: Callable) -> None:
         self.minimize_function = function
 
-    def _get_QFI(self, grad_list=[]):
-        """True
-        Given the input QC and it's gradient state list, calculate the assoicated
+    def get_QFI(self, grad_list: list[Gradient]=[]) -> np.ndarray:
+        """Given the input QC and it's gradient state list, calculate the assoicated
         QFI matrix by finding F_i,j = Re{<d_i psi| d_j psi>} - <d_i psi|psi><psi|d_j psi>
         for each i,j in n_params.
 
@@ -47,23 +37,23 @@ class Measurements():
             qfi_matrix : np.array
             A n_param * n_param matrix of the QFI matrix for the VQC.
         """
-        n_params = len([i for i in self._QC._parameterised if i > -1]) #these should both probably be getter methods but still
-        #print(f"Number of params is {n_params}")
+        n_params: int = len([i for i in self.QC.parameterised if i > -1])
+        grad_state_list: list[Gradient]
         if grad_list == []:
-            grad_state_list = self._QC.get_gradients()
+            grad_state_list = self.QC.get_gradients()
         else:
             grad_state_list = grad_list
 
         #get all single elements first
-        single_qfi_elements = np.zeros(n_params, dtype=np.complex128)
+        single_qfi_elements: np.ndarray = np.zeros(n_params, dtype=np.complex128)
         for param in range(n_params):
-            overlap = self._QC._quantum_state.overlap(grad_state_list[param])
+            overlap: float = self.QC.state.overlap(grad_state_list[param])
             single_qfi_elements[param] = overlap
 
-        qfi_matrix = np.zeros([n_params, n_params])
+        qfi_matrix: np.ndarray = np.zeros([n_params, n_params])
         for p in range(n_params):
             for q in range(p, n_params):
-                deriv_overlap = grad_state_list[p].overlap(grad_state_list[q])
+                deriv_overlap: float = grad_state_list[p].overlap(grad_state_list[q])
                 #single_qfi_elements[i] is <d_i psi | psi>
                 RHS = np.conjugate(single_qfi_elements[p]) * single_qfi_elements[q]
                 #assign p, qth elem of QFI, c.f eq (B3) in NIST review
@@ -74,49 +64,62 @@ class Measurements():
                 qfi_matrix[q, p] = qfi_matrix[p, q]
         return qfi_matrix
 
-    def get_eigenvalues(self, QFI):
+    def get_eigenvalues(self, QFI: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         eigvals, eigvecs = scipy.linalg.eigh(QFI)
         return eigvals, eigvecs
 
-    def get_effective_quantum_dimension(self, cutoff_eigvals):
+    def get_effective_quantum_dimension(self, cutoff_eigvals: float) -> int:
         """
         Get EFD by counting the # of non-zero eigenvalues of the QFI matrix.
         Returns:
             eff_quant_dim = Int
         """
-        QFI = self._get_QFI()
-        #print(QFI)
+        QFI: np.ndarray = self.get_QFI()
         eigvals, eigvecs = scipy.linalg.eigh(QFI)
-        print(eigvals)
-        nonzero_eigvals = eigvals[eigvals > cutoff_eigvals]
-        eff_quant_dim = len(nonzero_eigvals)
+        nonzero_eigvals: np.ndarray = eigvals[eigvals > cutoff_eigvals]
+        eff_quant_dim: int = len(nonzero_eigvals)
         return eff_quant_dim
 
-    def new_measure(self, QFI=None):
+    def new_measure(self, QFI: np.ndarray=None) -> int:
         if QFI is None:
-            QFI = self._get_QFI()
-        eigvals, eigvecs = scipy.linalg.eigh(QFI)
+            QFI = self.get_QFI()
+        eigvals, eigvecs = self.get_eigenvalues(QFI)
         capped = [1 if v > 1 else v for v in eigvals]
         return sum(capped)
 
-    def _gen_f_samples(self, sample_N):
+    def find_overparam_point(self, layer_index_list, epsilon: float=1e-3) -> int:
+        layers_to_add = [self.QC.get_layer(i) for i in layer_index_list]
+        prev_rank: int = 0
+        rank_diff: int = 1
+        count: int = 0
+        while rank_diff > epsilon and count < 1e6:
+            for l in layers_to_add:
+                self.QC.add_layer(l)
+            self.QC.update_state("random")
+            QFI = self.get_QFI()
+            rank: int = np.linalg.matrix_rank(QFI)
+            rank_diff = np.abs(rank - prev_rank)
+            print(f"Iteration {count}, r0={prev_rank}, r1={rank}, delta = {rank_diff}")
+            prev_rank = rank
+            count += 1
+        return count
+
+    def _gen_f_samples(self, sample_N: int) -> list[float]:
         """
         Generate random psi_theta and psi_pi $sample_N times for given PQC, then calculate
         |<psi_theta | psi_phi>|^2 which is F (1st moment of frame potential).
         Returns:
             F_samples = List of floats
         """
-        F_samples = []
-        for i in range(sample_N):
-            self._QC.gen_quantum_state(energy_out=False)
-            state1 = self._QC._quantum_state #psi theta
-            self._QC.gen_quantum_state(energy_out=False)
-            state2 = self._QC._quantum_state #psi phi 
-            F = np.abs(state1.overlap(state2))**2
+        F_samples: list[float] = []
+        states: list[qt.Qobj] = [self.QC.run("random") for i in range(sample_N)]
+        state_pairs = list(combinations(states, r=2))
+        for psi, phi in state_pairs:
+            F: float = np.abs(psi.overlap(phi))**2
             F_samples.append(F)
         return F_samples
 
-    def _gen_histo(self, F_samples, filt=0):
+    def _gen_histo(self, F_samples: list[float], filt: float=0) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generate the probability mass histogram (i.e sum(P_pqc) = 1) for the F_samples
         from the PQC.
@@ -124,9 +127,9 @@ class Measurements():
             prob: List of floats, 0 < p < 1 that are probabilities of state pair with Fidelity F
             F: List of floats, 0 < f < 1 that are fidelity midpoints,
         """
+        F_sample_arr: np.ndarray = np.array(F_samples)
         if filt > 0:
-            F_samples = np.array(F_samples)
-            F_samples = F_samples[F_samples < filt]
+            F_sample_arr = F_sample_arr[F_sample_arr < filt]
         #bin no. = 75 from paper
         prob, edges = np.histogram(F_samples, bins=int((75 / 10000) * len(F_samples)), range=(0, 1))#, range=(0, 1) #used to be 1, could be np.amax(F_samples)
         prob = prob / sum(prob) #normalise by sum of prob or length?
@@ -134,115 +137,65 @@ class Measurements():
         F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
         return prob, F
 
-    def _expr(self, F_samples, N, filt=0):
+    def expr(self, F_samples: list[float], N, filt: int=0) -> float:
         if len(F_samples) == 0:
             return 0
-        P_pqc, F = self._gen_histo(F_samples)
+        P_pqc, F = self._gen_histo(F_samples, filt)
 
-        haar = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
-        P_haar = haar / sum(haar) #do i need to normalise this?
-        #plt.figure("haar")
-        #plt.plot(F, P_haar, label="haar")
-        #plt.plot(F, P_pqc, label="pqc")
-        #plt.legend()
-
-        expr = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
+        haar: np.ndarray = (N - 1) * ((1 - F) ** (N - 2)) #from definition in expr paper
+        P_haar: np.ndarray = haar / sum(haar)
+        expr: float = np.sum(scipy.special.kl_div(P_pqc, P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
         return expr
-    
-    def _gen_log_histo(self, F_samples):
-        prob, edges = np.histogram((np.array(F_samples)), bins=int((75 / 10000) * len(F_samples))) #used to be 1, could be np.amax(F_samples)
-        prob = prob / sum(prob) #normalise by sum of prob or length?
-        #this F assumes bins go from 0 to 1. Calculate midpoints of bins from np.hist
 
-        
-        F = np.array([(edges[i - 1] + edges[i]) / 2 for i in range(1, len(edges))])
-        #plt.plot(F, [0 for i in range(len(F))], ls="", ms=4, marker="*")
-        return prob, F
-    
-    def _log_expr(self, F_samples, N):
-        if len(F_samples) == 0:
-            return 0
-        #P_pqc, F = self._gen_histo(F_samples)
-        log_P_pqc, log_F = self._gen_log_histo(F_samples)
-        
-        #first_term = np.log(N-1)
-        #second_term = (N - 2) 
-        #third_term = np.log(1 - F) #from definition in expr paper
-        #log_haar = first_term + second_term * third_term
-        log_haar = (N - 1) * ((1 - log_F) ** (N - 2))
-        log_P_haar = log_haar / sum(log_haar) #do i need to normalise this?
-        #plt.figure("log haar")
-        #plt.plot(np.log(F), log_P_haar, label="haar")
-        #plt.plot(log_F, log_P_pqc, label="pqc")
-
-        expr = np.sum(scipy.special.kl_div(log_P_pqc, log_P_haar)) #expr = np.sum(scipy.special.rel_entr(P_pqc, P_haar))
-        return np.log(expr)
-
-    def expressibility(self, sample_N, graphs=False):
+    def expressibility(self, sample_N: int) -> float:
         """
         Expressibility.
 
-        Given a PQC circuit, calculate $sample_N state pairs with randomised
+        Given a PQC circuit, calculate $sample_N$ state pairs with randomised
         parameters and their overlap integral. Use that to generate a Fidelity
         distribution and also generate the fidelity of the Haar state using the
         analytic expression. From both of those calculate the KL diveregence =
         relative entropy = Expressibility and return it.
 
-        Parameters:
-            sample_N: int
-                Number of random state sample pairs to generate.
-            graphs: bool, default = False
-                Whether or not to plot a graph of PQC fidelity distribution vs
-                Haar distribution.
         Returns:
             expr: float
                 The D_KL divergence of the fidelity distribution of the PQC
                 vs the distribution from the Haar expression.
         """
-        N = 2 ** self._QC._n_qubits
-
+        N: int = 2 ** self.QC.n_qubits
         F_samples = self._gen_f_samples(sample_N)
-        expr = self._expr(F_samples, N)
-
-        # if graphs is True:
-        #     plt.figure("Expressibility")
-        #     plt.plot(F, P_haar, label="Haar", color="C0", alpha=0.7, marker="x")
-        #     plt.plot(F, P_pqc, label="Quantum state", color="C1", alpha=0.7, marker=".")
-        #     pretty_subplot(plt.gca(), "Fidelity", "Probability", "Fidelity vs probability", 20)
-        #print(f"Expressibility is {expr}")
+        expr = self.expr(F_samples, N)
         return expr
+    
+    def find_eff_H(self, circuit_f_samples: list[float], n: QubitNumber) -> float:
+        def wrapper(n, F_samples=[]):
+            return self.expr(F_samples, n, filt=0.2)
 
-    def _gen_entanglement_samples(self, sample_N):
-        """Generate sample_N quantum states to be used for entanglement calculations"""
-        samples = []
-        for i in range(sample_N):
-            self._QC.gen_quantum_state(energy_out=False)
-            samples.append(self._QC._quantum_state)
-        return samples
+        def log_wrapper(n, F_samples=[]):
+            return self.log_expr(F_samples, n)
 
-    def _single_Q(self, system, n):
+        if n > 10: #change this later 
+            wrap_fn = log_wrapper
+        else:
+            wrap_fn = wrapper
+        out = scipy.optimize.minimize(wrap_fn, [4], args=(circuit_f_samples), method="BFGS") #Nelder-Mead
+        if out.success is True:
+            return out.x[0]
+        else:
+            print(out)
+            return 0
+
+    def single_Q(self, system: qt.Qobj, n: QubitNumber) -> float:
         """Calcuate Q value for single |psi> using average qubit purity."""
-        summand = 0
+        summand: float = 0
         for k in range(n):
-            density_matrix = system.ptrace(k)
+            density_matrix: qt.Qobj = system.ptrace(k)
             density_matrix *= density_matrix
             summand += density_matrix.tr()
         Q = 2 * (1 - (1 / n) * summand)
         return Q
     
-    def state_entanglement(self):
-        state = self._QC._quantum_state
-        summand = 0
-        n = self._QC._n_qubits
-        for k in range(n):
-            density_matrix = state.ptrace(k)
-            density_matrix *= density_matrix
-            summand += density_matrix.tr()
-        Q = 2 * (1 - (1 / n) * summand)
-        return Q
-        
-
-    def entanglement(self, sample_N, graphs=False):
+    def entanglement(self, sample_N: int) -> list[float]:
         """
         Entanglement.
 
@@ -259,116 +212,38 @@ class Measurements():
             ent: list of floats
                 List of $sample_N entanglement Q values for the PQC.
         """
-        n = self._QC._n_qubits
-        samples = self._gen_entanglement_samples(sample_N)
-        ent = [self._single_Q(s, n) for s in samples]
-
-        if graphs is True:
-            plt.figure("Entanglement")
-            plt.hist(ent, bins="fd")
-            pretty_subplot(plt.gca(), "Entanglement (Q)", "Count", "Entanglement (Q) histogram", 20)
+        n: QubitNumber = self.QC.n_qubits
+        samples: list[qt.Qobj] = [self.QC.run("random") for i in range(sample_N)]
+        ent: list[float] = [self.single_Q(s, n) for s in samples]
         return ent
 
-    def _gen_pauli_group(self):
-        N = self._QC._n_qubits
-        pauli_list = [qt.qeye(2), qt.sigmax(), qt.sigmay(), qt.sigmaz()]
-        strings = product(pauli_list, repeat=N)
-        P_n = [qt.tensor(list(s)) for s in strings]
-        return P_n
+    def theta_to_magic(self, angles: list[Angle]):
+        state: qt.Qobj = self.QC.run(angles=angles)
+        eom: float = self.renyi_entropy_fast(state)
+        return -1 * eom # -1 so we can minimize easily
 
-    def entropy_of_magic(self, psi=None, P_n=[]): #do we need to do this over many states?
-        if P_n == []:
-            P_n = self._gen_pauli_group()
-        if psi == None:
-            psi = self._QC._quantum_state
-        N = self._QC._n_qubits
-        d = 2**N
-        xi_p = []
-        for P in P_n:
-            xi_p.append((d**-1) * qt.expect(P, psi)**2)
-        norm = np.linalg.norm(xi_p, ord=2)
-        magic = -1 * np.log(d*norm**2) #should we use log10, ln or log
-        if magic > np.log(d + 1) - np.log(2):
-            print("Magic max (possibly)  exceeded!") #was upper bound wrong?
-            print(magic, magic / (np.log(d + 1) - np.log(2)))
-        return magic
-
-    def theta_to_magic(self, theta, P_n=[]):
-        if P_n == []:
-            P_n = self._gen_pauli_group()
-        QC = self._QC
-        QC._quantum_state = QC.run(angles=theta)
-        eom = self.entropy_of_magic(QC._quantum_state, P_n)
-        return -1 * eom # -1 so we can minize easily
-
-    def _gen_F_n_2(self):
-        N = self._QC._n_qubits
-        strings = list(product([0,1], repeat=N))
-        dims = [2 for i in range(2**N)]
-        states = [qt.state_number_qobj(dims, list(s)) for s in strings]
-        #print(
-        return states, strings
-
-    def _get_coeffs(self, psi=None, F=[]):
-        if F == []:
-            F, S = self._gen_F_n_2()
-        if psi is None:
-            psi = self._QC._quantum_state
-        coeffs = []
-        print(F)
-        for state in F:
-            c_i = state.overlap(psi)
-            coeffs.append(c_i)
-        return coeffs
-
-
-    def GKP_Magic(self, psi=None):
-        n_qubits = self._QC._n_qubits
-        if psi is None:
-            psi = self._QC._quantum_state
-        mag = 2**n_qubits
-        base_states = []
-        for i in list(product([0, 1], repeat=n_qubits)):
-                base_states.append(np.array(i))
-        to_index = 2**np.arange(n_qubits)[::-1]
-        conv_mat_bp = np.zeros([mag, mag], dtype=int)
-        conv_mat_add_in = np.zeros([mag, mag], dtype=int)
-        for j_count in range(mag):
-            base_j = base_states[j_count]
-            k_plus_j = np.mod(base_states + base_j, 2)
-            k_plus_j_index = np.sum(k_plus_j * to_index, axis=1)
-            conv_mat_add_in[j_count,:] = k_plus_j_index
-            binary_product = np.mod(np.dot(base_states, base_j), 2)
-            conv_mat_bp[j_count,:] = (-1)**binary_product
-        coeffs = psi.full()[:, 0]
-        GKP = 0
-        GKP= np.sum(np.abs(np.dot(np.conjugate(coeffs) * conv_mat_bp, coeffs[conv_mat_add_in]))) / (mag)
-        GKP = np.log2(GKP)
-        return GKP
-    
-    def theta_to_gkp(self, theta):
-        QC = self._QC
-        QC._quantum_state = QC.run(angles=theta)
-        gkp = self.GKP_Magic(QC._quantum_state)
-        return -1 * gkp # -1 so we can minize easily
+    def theta_to_gkp(self, angles: list[Angle]):
+        state: qt.Qobj = self.QC.run(angles=angles)
+        gkp: float = self.gkp_fast(state)
+        return -1 * gkp
     
     # The following fast reyni code is courtesy of txhaug
-    def numberToBase(self, n, b, n_qubits):
+    def numberToBase(self, n: float, b: float, n_qubits: QubitNumber) -> np.ndarray:
         if n == 0:
             return np.zeros(n_qubits, dtype=int)
-        digits = np.zeros(n_qubits, dtype=int)
-        counter = 0
+        digits: np.ndarray = np.zeros(n_qubits, dtype=int)
+        counter: int = 0
         while n:
             digits[counter] = int(n % b)
             n //= b
             counter += 1
         return digits[::-1]
 
-    def get_conversion_matrix_mod_add_index(self, base_states):
-        n_qubits = len(base_states[0])
-        mag = len(base_states)
-        to_index = 2**np.arange(n_qubits)[::-1]
-        conversion_matrix = np.zeros([mag, mag], dtype=int)
+    def get_conversion_matrix_mod_add_index(self, base_states: list[np.ndarray]) -> np.ndarray:
+        n_qubits: QubitNumber = len(base_states[0])
+        mag: int = len(base_states)
+        to_index: np.ndarray = 2**np.arange(n_qubits)[::-1]
+        conversion_matrix: np.ndarray = np.zeros([mag, mag], dtype=int)
         for j_count in range(mag):
             base_j = base_states[j_count]
             k_plus_j = np.mod(base_states + base_j, 2)
@@ -376,93 +251,95 @@ class Measurements():
             conversion_matrix[j_count, :] = k_plus_j_index
         return conversion_matrix
 
-    def get_conversion_matrix_binary_prod(self, base_states):
-        mag = len(base_states)
-        conversion_matrix = np.zeros([mag, mag], dtype=int)
+    def get_conversion_matrix_binary_prod(self, base_states: list[np.ndarray]) -> np.ndarray:
+        mag: int = len(base_states)
+        conversion_matrix: np.ndarray = np.zeros([mag, mag], dtype=int)
         for i_count in range(mag):
             base_i = base_states[i_count]
-            binary_product = np.mod(np.dot(base_states, base_i), 2)
+            binary_product: float = np.mod(np.dot(base_states, base_i), 2)
             conversion_matrix[i_count, :] = (-1)**binary_product
         return conversion_matrix
 
-    def get_conversion_matrices(self):
-        n = self._QC._n_qubits
+    def get_conversion_matrices(self) -> Tuple[np.ndarray, np.ndarray]:
+        n = self.QC.n_qubits
         base_states = [self.numberToBase(i, 2, n) for i in range(2**n)]
         conversion_matrix_binary_prod = self.get_conversion_matrix_binary_prod(base_states)
         conversion_matrix_mod_add_index = self.get_conversion_matrix_mod_add_index(base_states)
-        return [conversion_matrix_mod_add_index, conversion_matrix_binary_prod]
+        return (conversion_matrix_mod_add_index, conversion_matrix_binary_prod)
 
-    def renyi_entropy_fast(self, state, conversion_matrices=None, alpha=2):
+    def set_converstion_matrices(self, conv_mats: np.ndarray) -> None:
+        self.conversion_matrices = conv_mats
+
+    def renyi_entropy_fast(self, state: qt.Qobj, conversion_matrices: np.ndarray=None, alpha: float=2) -> float:
         if conversion_matrices is None:
             conversion_matrix_mod_add_index, conversion_matrix_binary_prod = self.get_conversion_matrices()
         else:
             conversion_matrix_mod_add_index, conversion_matrix_binary_prod = conversion_matrices
 
         coeffs = state.data.toarray()[:, 0]
-        n_qubits = len(state.dims[0])
+        n_qubits: QubitNumber = len(state.dims[0])
 
-        renyi_fast= np.sum(np.abs(2**(-n_qubits/2)*np.dot(np.conjugate(coeffs)*conversion_matrix_binary_prod, coeffs[conversion_matrix_mod_add_index] ))**(2*alpha))
+        renyi_fast: float = np.sum(np.abs(2**(-n_qubits/2)*np.dot(np.conjugate(coeffs)*conversion_matrix_binary_prod, coeffs[conversion_matrix_mod_add_index] ))**(2*alpha))
         renyi_fast = 1/(1-alpha)*np.log(renyi_fast)-np.log(2**n_qubits)
         return renyi_fast
 
+    def gkp_fast(self, state: qt.Qobj, conversion_matrices: np.ndarray=None) -> float:
+        return 1/(2*np.log(2))*self.renyi_entropy_fast(state, conversion_matrices, alpha=1/2)
 
-    def efficient_measurements(self, sample_N, expr=True, ent=True, eom=True, GKP=True, full_data=False, angles='random'):
-        n = self._QC._n_qubits
+    def efficient_measurements(self, sample_N: int, measure_expr: bool=True, measure_ent: bool=True, 
+                               measure_eom: bool=True, measure_GKP: bool=True, full_data: bool=False, 
+                               angles: Literal["random", "clifford"]='random') -> Dict:
+        n: QubitNumber = self.QC.n_qubits
         
         if sample_N == 0:
-            expr = False
-            ent = False
-            eom = False
-            GKP = False
+            measure_expr = False
+            measure_ent = False
+            measure_eom = False
+            measure_GKP = False
         
         if angles == 'clifford':
-            clifford_angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
-            init_angles = [[random.choice(clifford_angles) for i in range(self._QC.n_params)] for i in range(sample_N)]
-            states = [self._QC.run(angles=init) for init in init_angles]
+            clifford_angles: Tuple[Angle, Angle, Angle, Angle, Angle] = (0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi)
+            init_angles: list[list[Angle]] = [[random.choice(clifford_angles) for i in range(self.QC.n_params)] for i in range(sample_N)]
+            states: list[qt.Qobj] = [self.QC.run(angles=init) for init in init_angles]
         else:
-            states = [self._QC.gen_quantum_state() for i in range(sample_N)]
+            states = [self.QC.run(angles="random") for i in range(sample_N)]
         #need combinations to avoid (psi,psi) pairs and (psi, phi), (phi,psi) duplicates which mess up expr
         state_pairs = list(combinations(states, r=2))
-        overlaps = []
-        magics = []
-        gkps = []
-        q_vals = []
+        overlaps: list[float] = []
+        magics: list[float] = []
+        gkps: list[float] = []
+        q_vals: list[float] = []
 
-        if expr:
+        if measure_expr:
             for psi, phi in state_pairs:
                 F = np.abs(psi.overlap(phi))**2
                 overlaps.append(F)
             if n < 7: #if we're rnning to large N we only want the overlaps
-                expr = self._expr(overlaps, 2**n)
+                expr = self.expr(overlaps, 2**n)
             else:
                 expr = -1
         else:
             expr = -1
 
-        if ent and n < 13:
+        if measure_ent and n < 13:
             for psi in states:
-                Q = self._single_Q(psi, n)
+                Q = self.single_Q(psi, n)
                 q_vals.append(Q)
             q, std = np.mean(q_vals), np.std(q_vals)
         else:
             q, std = -1, -1
 
-        if eom and n < 9:
-            if self._P_n != []:
-                P_n = self._P_n
-            else:
-                P_n = self._gen_pauli_group()
-
+        if measure_eom and n < 9:
             for psi in states:
-                entropy_of_magic = self.entropy_of_magic(psi, P_n)
+                entropy_of_magic = self.renyi_entropy_fast(psi)
                 magics.append(entropy_of_magic)
             magic_bar, magic_std = np.mean(magics), np.std(magics)
         else:
             magic_bar, magic_std = -1, -1
 
-        if GKP and n < 13:
+        if measure_GKP and n < 13:
             for psi in states:
-                gkp = self.GKP_Magic(psi)
+                gkp = self.gkp_fast(psi)
                 gkps.append(gkp)
             gkp_bar, gkp_std = np.mean(gkps), np.std(gkps)
         else:
@@ -473,104 +350,68 @@ class Measurements():
         else:
             return {"Expr": expr, "Ent": [q, std], "Magic": [magic_bar, magic_std], "GKP": [gkp_bar, gkp_std]}
 
-    def meyer_wallach(self, sample_N): 
-        N = self._QC._n_qubits
-        
-        def iota(j, b): 
-            iotabras = []
-            iotakets = []
-            stringstates = [list(i) for i in product([0, 1], repeat = N)]
-            for state in stringstates: 
-                if state[j] == b: 
-                    iotabras.append(state)
-                    newstate = state[:j] + state[j+1:]
-                    iotakets.append(newstate)
-            projector = sum(qt.qip.qubits.qubit_states(N=N-1, states = iotakets[i])*qt.qip.qubits.qubit_states(N=N, states = iotabras[i]).dag() for i in range(len(iotakets)))
-            return projector
-        
-        def Distance(state1, state2): 
-            distance = 0.5*sum(sum((state1[i][0]*state2[j][0] - state1[j][0]*state2[i][0])*np.conj(state1[i][0]*state2[j][0] - state1[j][0]*state2[i][0]) for i in range(2**(N-1))) for j in range(2**(N-1)))
-            return distance    
-        
-        def Q(state): 
-            Q = (4/N)*sum(Distance(iota(i,0)*state,iota(i,1)*state) for i in range(N))
-            return Q
 
-        
-        entanglements = []
-        samples = self._gen_entanglement_samples(sample_N)
-        for system in samples: 
-            entanglements.append(Q(system))
-        mwexpr = np.mean(entanglements)
-        mwstd = np.std(entanglements)
-        print(f"Meyer-Wallach entanglement: {mwexpr} +/- {mwstd}")
-        return mwexpr, mwstd 
-
-    def get_gradient_vector(self, theta):
-        self._QC._quantum_state = self._QC.run(angles=theta)
-        psi = self._QC._quantum_state
-        self.gradient_list = self._QC.get_gradients()
-        gradients = []
+    def get_gradient_vector(self, theta: list[Angle]) -> list[Gradient]:
+        self.QC.state = self.QC.run(angles=theta)
+        psi = self.QC.state
+        self.gradient_list = self.QC.get_gradients()
+        gradients: list[Gradient] = []
         for i in self.gradient_list:
-            deriv = i
-            H_di_psi = self._QC.H * deriv
-            d_i_f_theta = 2 * np.real(psi.overlap(H_di_psi))
+            deriv: Gradient = i
+            H_di_psi: qt.Qobj = self.QC.H * deriv
+            d_i_f_theta: Gradient = 2 * np.real(psi.overlap(H_di_psi))
             gradients.append(d_i_f_theta)
         return gradients
 
-    def train(self, epsilon=1e-6, rate=0.001, method="gradient", angles=[], trajectory=False, magic=False, ent=False, verbose=False):
-        quit_iterations = 100000
-        count = 0
-        diff = 1
-        traj = []
-        magics = []
-        gkps = []
-        ents = []
-
-        P_n = self._gen_pauli_group()
+    def train(self, epsilon: float=1e-6, rate: float=0.001, method: str="gradient", 
+              angles: Union[list[Angle], Literal["random"]]="random", 
+              verbose: bool=False) -> Tuple[float, list[float], list[float], list[float], list[float]]:
+        quit_iterations: int = 100000
+        count: int = 0
+        diff: float = 1
+        traj: list[float] = []
+        magics: list[float] = []
+        gkps: list[float] = []
+        ents: list[float] = []
 
         def trajmaj(Xi):
-            eom = self.entropy_of_magic(psi=self._QC._quantum_state, P_n=P_n)
+            eom = self.renyi_entropy_fast(self.QC.state)
             magics.append(eom)
             trajectory = self.minimize_function(Xi)
             traj.append(trajectory)
-            entanglement = self._single_Q(self._QC._quantum_state, self._QC._n_qubits)
+            entanglement = self.single_Q(self.QC.state, self.QC.n_qubits)
             ents.append(entanglement)
-            gkp = self.GKP_Magic(psi=self._QC._quantum_state)
+            gkp = self.gkp_fast(self.QC.state)
             gkps.append(gkp)
 
-        self._QC._quantum_state = self._QC.run(angles=angles)
+        self.QC.state = self.QC.run(angles=angles)
         trajmaj(angles)
 
         if method.lower() in ["gradient", "qng"]:
-            #self._QC._quantum_state = self._QC.run(angles=angles)
-            prev_energy = self.minimize_function(angles)
+            prev_energy: float = self.minimize_function(angles)
             while diff > epsilon and count < quit_iterations:
-                theta = self._QC.get_params()
-                gradients = self.get_gradient_vector(theta)
+                theta: list[Angle] = self.QC.get_params()
+                gradients: list[Gradient] = self.get_gradient_vector(theta)
 
                 if method == "gradient":
-                    theta_update = list(np.array(theta) - rate * np.array(gradients))
+                    theta_update: list[Angle] = list(np.array(theta) - rate * np.array(gradients))
                 elif method == "QNG": #some serious problems here, think we need renormalizaiton
-                    QFI = self._get_QFI(grad_list=self.gradient_list)
+                    QFI = self.get_QFI(grad_list=self.gradient_list)
                     inverse = np.linalg.pinv(QFI)
                     f_inv_grad_psi = inverse.dot(np.array(gradients))
                     theta_update = list(np.array(theta) - rate * f_inv_grad_psi)
 
                 if count % 100 == 0 and verbose is True:
                     print(f"On iteration {count}, energy = {prev_energy}, diff is {diff}")
-                energy = self.minimize_function(theta_update)
+
+                energy: float = self.minimize_function(theta_update) #NB: PQC statue update occurs here
                 diff = np.abs(energy - prev_energy)
 
                 trajmaj(theta_update)
                 count += 1
                 prev_energy = energy
         else:
-            if self.minimize_function == self.theta_to_magic:
-                op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
-                                                method=method, args=[P_n], callback=trajmaj, tol=epsilon)
-            else:
-                op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
+            op_out = scipy.optimize.minimize(self.minimize_function, x0=angles, 
                                              method=method, callback=trajmaj, tol=epsilon)
             energy = op_out.fun
-        return [energy, traj, magics, ents, gkps]
+        return (energy, traj, magics, ents, gkps)
