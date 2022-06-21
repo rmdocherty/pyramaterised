@@ -270,7 +270,7 @@ class Measurements():
     def set_converstion_matrices(self, conv_mats: np.ndarray) -> None:
         self.conversion_matrices = conv_mats
 
-    def renyi_entropy_fast(self, state: qt.Qobj, conversion_matrices: np.ndarray=None, alpha: float=2) -> float:
+    def renyi_entropy_fast(self, state: qt.Qobj, conversion_matrices: Tuple[np.ndarray, np.ndarray]=None, alpha: float=2) -> float:
         if conversion_matrices is None:
             conversion_matrix_mod_add_index, conversion_matrix_binary_prod = self.get_conversion_matrices()
         else:
@@ -282,8 +282,14 @@ class Measurements():
         renyi_fast: float = np.sum(np.abs(2**(-n_qubits/2)*np.dot(np.conjugate(coeffs)*conversion_matrix_binary_prod, coeffs[conversion_matrix_mod_add_index] ))**(2*alpha))
         renyi_fast = 1/(1-alpha)*np.log(renyi_fast)-np.log(2**n_qubits)
         return renyi_fast
+    
+    def entropy_of_magic(self, sample_N: int):
+        states: list[qt.Qobj] = [self.QC.run("random") for i in range(sample_N)]
+        conv_mats = self.get_conversion_matrices()
+        magics: list[float] = [self.renyi_entropy_fast(i, conv_mats) for i in states]
+        return np.mean(magics)
 
-    def gkp_fast(self, state: qt.Qobj, conversion_matrices: np.ndarray=None) -> float:
+    def gkp_fast(self, state: qt.Qobj, conversion_matrices: Tuple[np.ndarray, np.ndarray]=None) -> float:
         return 1/(2*np.log(2))*self.renyi_entropy_fast(state, conversion_matrices, alpha=1/2)
 
     def efficient_measurements(self, sample_N: int, measure_expr: bool=True, measure_ent: bool=True, 
@@ -309,6 +315,7 @@ class Measurements():
         magics: list[float] = []
         gkps: list[float] = []
         q_vals: list[float] = []
+        conv_mats = self.get_conversion_matrices()
 
         if measure_expr:
             for psi, phi in state_pairs:
@@ -331,7 +338,7 @@ class Measurements():
 
         if measure_eom and n < 9:
             for psi in states:
-                entropy_of_magic = self.renyi_entropy_fast(psi)
+                entropy_of_magic = self.renyi_entropy_fast(psi, conv_mats)
                 magics.append(entropy_of_magic)
             magic_bar, magic_std = np.mean(magics), np.std(magics)
         else:
@@ -339,7 +346,7 @@ class Measurements():
 
         if measure_GKP and n < 13:
             for psi in states:
-                gkp = self.gkp_fast(psi)
+                gkp = self.gkp_fast(psi, conv_mats)
                 gkps.append(gkp)
             gkp_bar, gkp_std = np.mean(gkps), np.std(gkps)
         else:

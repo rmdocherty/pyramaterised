@@ -1,4 +1,4 @@
-import pyqc
+from pyqc_lib import pyqc
 from math import isclose
 import numpy as np
 import qutip as qt

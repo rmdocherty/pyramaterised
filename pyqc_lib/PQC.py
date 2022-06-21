@@ -91,12 +91,12 @@ class PQC():
                 angle1: Angle
                 angle2: Angle
                 # start by checking if it's random so otherwise type check knows it will be type list[Angle]
-                if angles == "random": #use random params
-                    angle1 = rng.random(1)[0] * 2 * np.pi
-                    angle2 = rng.random(1)[0] * 2 * np.pi
-                elif angles != []:
+                if type(angles) != str:
                     angle1 = angles[param_counter]
                     angle2 = angles[param_counter + 1]
+                elif angles == "random": #use random params
+                    angle1 = rng.random(1)[0] * 2 * np.pi
+                    angle2 = rng.random(1)[0] * 2 * np.pi
                 else:
                     raise Exception("No parameters supplied!")
                 g.set_theta(angle1)
@@ -104,10 +104,10 @@ class PQC():
                 param_counter += 2
 
             elif g.param_count == 1:
-                if angles == "random": #use random params
-                    angle1 = rng.random(1)[0] * 2 * np.pi
-                elif angles != []:
+                if type(angles) != str:
                     angle1 = angles[param_counter]
+                elif angles == "random": #use random params
+                    angle1 = rng.random(1)[0] * 2 * np.pi
                 else:
                     raise Exception("No parameters supplied!")
                 g.set_theta(angle1)
