@@ -6,7 +6,7 @@ Created on Fri Oct 15 11:22:14 2021
 @author: ronan
 """
 #%% Imports
-from gates import *
+from .gates import *
 
 
 class PQC():
@@ -23,6 +23,8 @@ class PQC():
         self.state: qt.Qobj = self.initial_state
 
     def set_H(self, H: Union[str, qt.Qobj]):
+        """Set Hamiltonian PQC uses for training and gradient calculation. Default is 'ZZ'
+        Hamiltonian but custom qutip hamiltonians can be set."""
         if H == 'ZZ':
             Z0: qt.Qobj = genFockOp(qt.sigmaz(), 0, self.n_qubits, 2)
             Z1: qt.Qobj = genFockOp(qt.sigmaz(), 1, self.n_qubits, 2)
@@ -123,19 +125,19 @@ class PQC():
         return circuit_state
 
     def update_state(self, angles: Union[list[Angle], Literal["random"]]) -> qt.Qobj:
-        """Set quantum state of circuit from angles."""
+        """Set quantum state of circuit from angles and return it. Modifies an attribute."""
         self.state = qt.Qobj(self.run(angles))
         return self.state
 
     def cost(self, angles: Union[list[Angle], Literal["random"]]) -> float:
-        """Get energy of |psi>, the initial quantum state"""
+        """Get energy of |psi>, the initial quantum state via <psi|H|psi>"""
         self.state = self.run(angles=angles)
         psi = self.state
         energy: float = qt.expect(self.H, psi)
         return energy
 
     def fidelity(self, target_state: qt.Qobj) -> float:
-        #get fidelity w.r.t target state
+        """Compute and return F = |<psi|phi>|**2"""
         fidelity: float = np.abs(self.state.overlap(target_state))**2
         return fidelity
 
@@ -146,7 +148,10 @@ class PQC():
 
     def take_derivative(self, g_on: Gate, param: Literal[0, 1, 2]=0) -> Gradient:
         """Get the derivative of the ith parameter of the circuit and return
-        the circuit where the ith gate is multiplied by its derivative."""
+        the circuit where the ith gate is multiplied by its derivative.
+        Returns:
+            circuit_state: Gradient of circuit w.r.t ith parameter.
+        """
         #need to find which gate the ith parameterised gate is
         g_loc: int = self.gates.index(g_on) 
         #copy so don't overwrite later - much better than deepcopying whole circuit!
@@ -168,7 +173,10 @@ class PQC():
 
     def get_gradients(self) -> list[Gradient]:
         """Get the n_params circuits with the ith derivative multiplied in and
-        then apply them to the basis state."""
+        then apply them to the basis state.
+        Returns:
+            gradient_state_list: list of gradients with respect to each parameter in the circuit
+        """
         gradient_state_list: list[Gradient] = []
         parameterised: list[Gate] = [i for i in self.gates if i.param_count > 0]
         for count, g in enumerate(parameterised):

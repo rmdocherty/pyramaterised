@@ -5,7 +5,7 @@ Created on Wed Nov 17 12:19:54 2021
 
 @author: ronan
 """
-import PQC as pqc
+from .circuit import *
 import qutip as qt
 import numpy as np
 import random
@@ -15,7 +15,7 @@ LEN_CLIFF_STRING = 3
 
 
 def clifford_circuit_layers(p, N, method='random'):
-    clifford_gates = [pqc.H, pqc.S, pqc.CZ, pqc.CNOT]
+    clifford_gates = [H, S, CZ, CNOT]
     layers = []
     qs = list(range(N))
 
@@ -24,10 +24,10 @@ def clifford_circuit_layers(p, N, method='random'):
             layer = []
             for n in range(N):
                 gate = random.choice(clifford_gates)
-                if issubclass(gate, pqc.PRot): #can't check is_param of this as not instantised yet - could make class variable?
+                if issubclass(gate, PRot): #can't check is_param of this as not instantised yet - could make class variable?
                     q_on = random.randint(0, N - 1)
                     layer.append(gate(q_on, N))
-                elif issubclass(gate, pqc.EntGate): #entangling gate
+                elif issubclass(gate, EntGate): #entangling gate
                     q_1, q_2 = random.sample(qs, k=2) #use sample so can't pick same option twice
                     layer.append(gate([q_1, q_2], N))
             layers.append(layer)
@@ -43,7 +43,7 @@ def clifford_circuit_layers(p, N, method='random'):
                 for gate in string:
                     layer.append(gate(qs_on[count], N))
                 count += 1
-            layer.append(pqc.CHAIN(pqc.CNOT, N)) #add entangling layer
+            layer.append(CHAIN(CNOT, N)) #add entangling layer
             layers.append(layer)
     return layers
 
@@ -64,8 +64,9 @@ def gen_shift_list(p, N):
 
 
 def NPQC_layers(p, N):
+    """Generate layers of the NPQC circuit which has identity QFIM when initialised with reference angles."""
     #started with fixed block of N R_y and N R_x as first layer
-    initial_layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)]
+    initial_layer = [R_y(i, N) for i in range(N)] + [R_z(i, N) for i in range(N)]
     angles = [np.pi / 2 for i in range(N)] + [0 for i in range(N)]
     layers = [initial_layer]
     shift_list = gen_shift_list(p, N)
@@ -76,16 +77,16 @@ def NPQC_layers(p, N):
         #U_ent layer - not paramterised and shouldn't be counted as such!
         for k in range(1, 1 + N // 2):
             q_on = 2 * k - 2
-            rotation = pqc.fixed_R_y(q_on, N, np.pi / 2) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
+            rotation = fixed_R_y(q_on, N, np.pi / 2) #NB these fixed gates aren't parametrised and shouldn't be counted in angles
             fixed_rots.append(rotation)
-            U_ent = pqc.CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
+            U_ent = CPHASE([q_on, ((q_on + 1) + 2 * a_l) % N], N)
             cphases.append(U_ent)
         p_layer = fixed_rots + cphases #need fixed r_y to come before c_phase
 
         #rotation layer - R_y then R_z on each kth qubit
         for k in range(1, N // 2 + 1):
             q_on = 2 * k - 2
-            p_layer = p_layer + [pqc.R_y(q_on, N), pqc.R_z(q_on, N)]
+            p_layer = p_layer + [R_y(q_on, N), R_z(q_on, N)]
             #R_y gates have theta_i = pi/2 for theta_r
             angles.append(np.pi / 2)
             #R_z gates have theta_i = 0 for theta_r
@@ -95,22 +96,23 @@ def NPQC_layers(p, N):
 
 
 def string_to_entangler(string):
+    """Given entangler string, return which gate it corresponds to."""
     lower = string.lower()
     if lower == "cnot":
-        entangler = pqc.CNOT
+        entangler = CNOT
     elif lower == "cphase":
-        entangler = pqc.CPHASE
+        entangler = CPHASE
     elif lower == "cz":
-        entangler = pqc.CZ
+        entangler = CZ
     elif lower == "sqrtiswap":
-        entangler = pqc.sqrtiSWAP
+        entangler = sqrtiSWAP
     else:
         raise Exception("Must supply a valid entangler!")
     return entangler
 
-
+"""These circuits are defined in arXiv:1905.10876v1"""
 def circuit_1_layers(p, N):
-    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)]
+    layer = [R_x(i, N) for i in range(N)] + [R_y(i, N) for i in range(N)]
     layers = []
     for i in range(p):
         layers.append(layer)
@@ -119,7 +121,7 @@ def circuit_1_layers(p, N):
 
 def circuit_2_layers(p, N, ent_str="cnot"):
     entangler = string_to_entangler(ent_str)
-    layer = [pqc.R_x(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layer = [R_x(i, N) for i in range(N)] + [R_z(i, N) for i in range(N)] + [CHAIN(entangler, N)]
     layers = []
     for i in range(p):
         layers.append(layer)
@@ -128,7 +130,7 @@ def circuit_2_layers(p, N, ent_str="cnot"):
 
 def circuit_9_layers(p, N, ent_str="cphase"):
     entangler = string_to_entangler(ent_str)
-    layer = [pqc.H(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)] + [pqc.R_x(i, N) for i in range(N)]
+    layer = [H(i, N) for i in range(N)] + [CHAIN(entangler, N)] + [R_x(i, N) for i in range(N)]
     layers = []
     for i in range(p):
         layers.append(layer)
@@ -136,11 +138,12 @@ def circuit_9_layers(p, N, ent_str="cphase"):
 
 
 def qg_circuit_layers(p, N, ent_str="cnot"):
+    """This circuit defined in arXiv:2102.01659v1"""
     entangler = string_to_entangler(ent_str)
-    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-    layer1 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
-    layer2 = [pqc.R_x(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
-    layer3 = [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    init_layer = [fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer1 = [R_z(i, N) for i in range(N)] + [CHAIN(entangler, N)]
+    layer2 = [R_x(i, N) for i in range(N)] + [CHAIN(entangler, N)]
+    layer3 = [R_z(i, N) for i in range(N)] + [CHAIN(entangler, N)]
     layer = layer1 + layer2 + layer3
     layers = [init_layer]
     for i in range(p):
@@ -149,46 +152,53 @@ def qg_circuit_layers(p, N, ent_str="cnot"):
 
 
 def generic_HE_layers(p, N, ent_str="cnot"):
+    """A generic Hardware Efficient """
     entangler = string_to_entangler(ent_str)
-    init_layer = [pqc.fixed_R_y(i, N, np.pi / 4) for i in range(N)]
-    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    init_layer = [fixed_R_y(i, N, np.pi / 4) for i in range(N)]
+    layer = [R_y(i, N) for i in range(N)] + [R_z(i, N) for i in range(N)] + [CHAIN(entangler, N)]
     layers = [init_layer] 
     for i in range(p):
         layers.append(layer)
     return layers
 
 def clifford_HE_layers(p, N, ent_str="cnot"):
+    """A clifford circuit (when angles set to clifford angles)."""
     entangler = string_to_entangler(ent_str)
-    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_z(i, N) for i in range(N)] + [pqc.CHAIN(entangler, N)]
+    layer = [R_y(i, N) for i in range(N)] + [R_z(i, N) for i in range(N)] + [CHAIN(entangler, N)]
     layers = [] 
     for i in range(p):
         layers.append(layer)
     return layers
 
 def y_CPHASE_layers(p, N):
+    """A y-CPHASE circuit of y rotations and CPHASe entanglers. Has interesting properties relative to other
+    hardware efficient circuits."""
     layers = []
-    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
+    layer = [R_y(i, N) for i in range(N)] + [CHAIN(CPHASE, N)]
     for i in range(p):
         layers.append(layer)
     return layers
 
 def double_y_CPHASE_layers(p, N):
+    """Same as y-CPHASE circuit but has same number of parameters as other HE circuits (to ensure properties
+     not due to lower parameter number)."""
     layers = []
-    layer = [pqc.R_y(i, N) for i in range(N)] + [pqc.R_y(i, N) for i in range(N)] + [pqc.CHAIN(pqc.CPHASE, N)]
+    layer = [R_y(i, N) for i in range(N)] + [R_y(i, N) for i in range(N)] + [CHAIN(CPHASE, N)]
     for i in range(p):
         layers.append(layer)
     return layers
 
-# ============================== PROBLEM INPSIRED CIRCUITS ==============================
+# ============================== PROBLEM INSPIRED CIRCUITS ==============================
 
 
 def TFIM_layers(p, N):
-    initial_layer = [pqc.H(i, N) for i in range(N)]
+    """TFIM circuit based on Transverse-Field-Ising-Model and DOI:10.1103/prxquantum.1.020319"""
+    initial_layer = [H(i, N) for i in range(N)]
     layers = [initial_layer]
     for i in range(p):
-        first_half = [pqc.RR_block(pqc.R_zz, N)]
-        second_layer = [pqc.R_x(i, N) for i in range(N)]
-        second_half = [pqc.shared_parameter(second_layer, N)]
+        first_half = [RR_block(R_zz, N)]
+        second_layer = [R_x(i, N) for i in range(N)]
+        second_half = [shared_parameter(second_layer, N)]
         layer = first_half + second_half
         layers.append(layer)
     return layers
@@ -197,26 +207,28 @@ def TFIM_layers(p, N):
 def modified_TFIM_layers(p, N):
     layers = []
     for i in range(p):
-        first_half = [pqc.RR_block(pqc.R_zz, N)]
-        second_layer = [pqc.R_x(i, N) for i in range(N)]
-        second_half = [pqc.shared_parameter(second_layer, N)]
-        third_layer = [pqc.R_z(i, N) for i in range(N)]
-        third_half = [pqc.shared_parameter(third_layer, N)]
+        first_half = [RR_block(R_zz, N)]
+        second_layer = [R_x(i, N) for i in range(N)]
+        second_half = [shared_parameter(second_layer, N)]
+        third_layer = [R_z(i, N) for i in range(N)]
+        third_half = [shared_parameter(third_layer, N)]
         layer = first_half + second_half + third_half
         layers.append(layer)
     return layers
 
 
 def TFIM_hamiltonian(N, g, h=0):
+    """TFIM Hamiltonian - used for minimisation."""
     H = 0
     for i in range(N):
         i_plus = (i + 1) % N
-        H += pqc.genFockOp(qt.sigmaz(), i, N) * pqc.genFockOp(qt.sigmaz(), i_plus, N) + g * pqc.genFockOp(qt.sigmax(), i, N) + h * pqc.genFockOp(qt.sigmaz(), i, N)
+        H += genFockOp(qt.sigmaz(), i, N) * genFockOp(qt.sigmaz(), i_plus, N) + g * genFockOp(qt.sigmax(), i, N) + h * genFockOp(qt.sigmaz(), i, N)
     H = -1 * H
     return H
 
 
 def XXZ_layers(p, N, commute=False):
+    """XXZ circuit from DOI:10.1103/prxquantum.1.020319"""
     even_indices = []
     odd_indices = []
     for i in range(1, (N // 2) + 1): # -1 to convert from 1 indexed paper defn to 0 indexed qubit lists
@@ -225,38 +237,39 @@ def XXZ_layers(p, N, commute=False):
         odd_bot, odd_top = (2 * i) - 1, ((2 * i + 1) - 1) % N #need mod N here
         odd_indices.append((odd_bot, odd_top))
 
-    init_x_bits = [pqc.X(i, N) for i in range(N)]
-    init_H = [pqc.H(i, N) for i in range(N) if i % 2 == 0] #H on even links
-    init_CNOT = [pqc.CNOT([i, j], N) for i, j in even_indices]
+    init_x_bits = [X(i, N) for i in range(N)]
+    init_H = [H(i, N) for i in range(N) if i % 2 == 0] #H on even links
+    init_CNOT = [CNOT([i, j], N) for i, j in even_indices]
     #layers = [init_x_bits, init_H, init_CNOT]
     layers = []
     for l in range(p):
         layer = []
-        ZZ_1 = [pqc.R_zz((i, j), N) for i, j in odd_indices]
-        YY_XX_1 = [pqc.R_yy((i, j), N) for i, j in odd_indices] + [pqc.R_xx((i, j), N) for i, j in odd_indices]
-        ZZ_2 = [pqc.R_zz((i, j), N) for i, j in even_indices]
-        YY_XX_2 = [pqc.R_yy((i, j), N) for i, j in even_indices] + [pqc.R_xx((i, j), N) for i, j in even_indices]
-        theta = [pqc.shared_parameter(ZZ_1, N)]
-        phi = [pqc.shared_parameter(YY_XX_1, N, commute=commute)]
-        beta = [pqc.shared_parameter(ZZ_2, N)]
-        gamma = [pqc.shared_parameter(YY_XX_2, N, commute=commute)]
+        ZZ_1 = [R_zz((i, j), N) for i, j in odd_indices]
+        YY_XX_1 = [R_yy((i, j), N) for i, j in odd_indices] + [R_xx((i, j), N) for i, j in odd_indices]
+        ZZ_2 = [R_zz((i, j), N) for i, j in even_indices]
+        YY_XX_2 = [R_yy((i, j), N) for i, j in even_indices] + [R_xx((i, j), N) for i, j in even_indices]
+        theta = [shared_parameter(ZZ_1, N)]
+        phi = [shared_parameter(YY_XX_1, N, commute=commute)]
+        beta = [shared_parameter(ZZ_2, N)]
+        gamma = [shared_parameter(YY_XX_2, N, commute=commute)]
         layer = theta + phi + beta + gamma
         layers.append(layer)
     return layers
 
 
 def gen_theta_block(q1, q2, N):
+    """Unit used in fermionic circuit."""
     block = []
-    block.append(pqc.sqrtiSWAP([q1, q2], N))
+    block.append(sqrtiSWAP([q1, q2], N))
 
-    minus_rot = pqc.negative_R_z(q1, N)
-    offset_rot = pqc.offset_R_z(q2, N, np.pi)
-    shared_param = pqc.shared_parameter([minus_rot, offset_rot], N)
+    minus_rot = negative_R_z(q1, N)
+    offset_rot = offset_R_z(q2, N, np.pi)
+    shared_param = shared_parameter([minus_rot, offset_rot], N)
     block.append(shared_param)
 
-    block.append(pqc.sqrtiSWAP([q1, q2], N))
+    block.append(sqrtiSWAP([q1, q2], N))
 
-    fixed = pqc.fixed_R_z(q2, N, np.pi)
+    fixed = fixed_R_z(q2, N, np.pi)
     block.append(fixed)
     return block
 
@@ -267,6 +280,7 @@ def list_to_pairs(x):
 
 
 def fermionic_circuit_layers(p, N):
+    """Fermionic circuit: diamond shaped arrangement of 'theta blocks'."""
     layers = []
     for j in range(p):
         blocks = []
@@ -291,13 +305,16 @@ def fermionic_circuit_layers(p, N):
 
 
 def fSim_circuit_layers(p, N, rotator='y', fixed=False):
+    """Circuit made up of google fSim gates and rotations. Can construct the zfsim gate by
+    fixing the rotations to z gates (rather than the default y gates). Uses periodic
+    boundary conditions to choose connections."""
     r = rotator.lower()
     if r == 'y':
-        rot_gate = pqc.R_y
+        rot_gate = R_y
     elif r == 'x':
-        rot_gate = pqc.R_x
+        rot_gate = R_x
     elif r == 'z':
-        rot_gate = pqc.R_z
+        rot_gate = R_z
     else:
         raise Exception("Please supply a valid single qubit rotator")
     layers = []
@@ -307,9 +324,9 @@ def fSim_circuit_layers(p, N, rotator='y', fixed=False):
             offset = l % 2
             for i in range(offset, N, 2):
                 if fixed is True:
-                    gate = pqc.fixed_fSim([i, (i+1)%N], N)
+                    gate = fixed_fSim([i, (i+1)%N], N)
                 else:
-                    gate = pqc.fSim([i, (i+1)%N], N)
+                    gate = fSim([i, (i+1)%N], N)
                 layer.append(gate)
         else:
             offset = l % N
@@ -327,9 +344,9 @@ def fSim_circuit_layers(p, N, rotator='y', fixed=False):
             pairs = pairs + [(indices[i], indices[j]) for i, j in connect_indices]
             for pair in pairs:
                 if fixed is True:
-                    gate = pqc.fixed_fSim([pair[0], pair[1]], N)
+                    gate = fixed_fSim([pair[0], pair[1]], N)
                 else:
-                    gate = pqc.fSim([pair[0], pair[1]], N)
+                    gate = fSim([pair[0], pair[1]], N)
                 layer.append(gate)
             layer.append(rot_gate(offset, N))
         layers.append(layer)
@@ -342,7 +359,8 @@ def add_layers(circuit, layers):
 
 
 def generate_circuit(circuit_type, N, p, hamiltonian="ZZ", rotator='', shuffle=True):
-    circuit = pqc.PQC(N)
+    """Create N qubit, p layer circuit given its string representation."""
+    circuit = PQC(N)
 
     if circuit_type == "NPQC":
         layers, theta_ref = NPQC_layers(p, N)
