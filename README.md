@@ -1,9 +1,9 @@
 <h1 align="center">
-<img src="images/repo_logo.png" width="450">
+<img src="images/repo_logo.png" width="650">
 </h1><br>
 
 ## About:
-`PyQC` is a framework for creating and measuring Parameterised Quantum Circuits (PQCs)
+`pyramaterised` is a framework for creating and measuring Parameterised Quantum Circuits (PQCs)
 in Python, by acting as a wrapper around the [`QuTIP` library](https://qutip.org/). A series of PQCs from the
 literature have been implemented using the framework alongside various collated capacity
 measures.
@@ -15,7 +15,7 @@ measures.
 ## Usage:
 Simply run in your current (virtual) environment:
 ```
-pip install pyqc
+pip install pyramaterised
 ```
 Check out `example.py` or `tests.py` for examples of the framework in action.
 

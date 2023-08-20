@@ -1,4 +1,4 @@
-import pyqc
+import pyramaterised as pyqc
 import random
 import numpy as np
 

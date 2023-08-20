@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 
 .vscode/*
+images/logo.png*
+images/logo.qpic
