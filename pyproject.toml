@@ -1,0 +1,24 @@
+[project]
+name = "PyQC"
+version = "1.0"
+authors = [
+  { name="Ronan Docherty", email="ronan.docherty18@imperial.ac.uk"},
+]
+description = "Library for building, simulating and measuring Parameterised Quantum Circuits (PQCs)."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/rmdocherty/PyQC"
+"Bug Tracker" = "https://github.com/rmdocherty/PyQC/issues"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["pyqc"] 
