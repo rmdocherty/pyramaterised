@@ -1,5 +1,5 @@
 [project]
-name = "PyQC"
+name = "pyramaterised"
 version = "1.0"
 authors = [
   { name="Ronan Docherty", email="ronan.docherty18@imperial.ac.uk"},
@@ -14,11 +14,11 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/rmdocherty/PyQC"
-"Bug Tracker" = "https://github.com/rmdocherty/PyQC/issues"
+"Homepage" = "https://github.com/rmdocherty/pyramaterised"
+"Bug Tracker" = "https://github.com/rmdocherty/pyramaterised/issues"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
-where = ["pyqc"] 
+where = ["pyramaterised"] 

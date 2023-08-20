@@ -6,7 +6,7 @@ import qutip as qt
 import scipy
 import random
 
-import pyqc
+import pyramaterised as pyqc
 
 
 class RandUnitary(pyqc.PQC):
