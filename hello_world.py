@@ -1,5 +1,4 @@
-import pyqc
-import pyqc.measure
+import pyqc, pyqc.measure
 import random
 import numpy as np
 """Define a 4-qubit, 6-layer PQC with X rotations on each 
