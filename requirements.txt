@@ -7,7 +7,6 @@ numpy==1.25.2
 packaging==23.1
 Pillow==10.0.0
 pyparsing==3.0.9
--e git+https://github.com/rmdocherty/PyQC@cdf61c6dcb40b666d9442e1befcb41787a0a73fa#egg=PyQC
 python-dateutil==2.8.2
 qutip==4.7.2
 scipy==1.11.2
