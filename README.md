@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="images/repo_logo.png" width="800">
+<img src="images/repo_logo.png" width="450">
 </h1><br>
 
 ## About:
