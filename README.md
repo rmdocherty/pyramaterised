@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="images/repo_logo.png" width="650">
+<img src="https://rmdocherty.github.io/images/repo_logo.png" width="650">
 </h1><br>
 
 ## About:
@@ -9,7 +9,7 @@ literature have been implemented using the framework alongside various collated 
 measures.
 
 <h1 align="center">
-<img src="images/explainer.png" width="1200">
+<img src="https://rmdocherty.github.io/images/explainer.png" width="1200">
 </h1>
 
 ## Usage:
@@ -17,12 +17,15 @@ Simply run in your current (virtual) environment:
 ```
 pip install pyramaterised
 ```
-Check out `example.py` or `tests.py` for examples of the framework in action.
+Check out `example.py` or `tests.py` for examples of the framework in action. To run tests,
+```
+python tests.py
+```
 
 ## Circuits:
 
 <h1 align="center">
-<img src="images/circuits.png" width="1200">
+<img src="https://rmdocherty.github.io/images/circuits.png" width="1200">
 </h1>
 
 A diagram of some of the circuits available in the library (custom circuits can be easily constructed). NPQC diagram from [[1]](https://arxiv.org/abs/2107.14063), XXZ and TFIM circuits adapted from [[2]](https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.1.020319) and fermionic circuit diagram from [[3]](https://www.science.org/doi/10.1126/science.abb9811).
